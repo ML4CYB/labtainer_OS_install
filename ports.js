@@ -31,7 +31,8 @@ var app = Elm.Exosphere.init({
         randomSeed2: randomSeeds[2],
         randomSeed3: randomSeeds[3],
         epoch : Date.now(),
-        showDebugMsgs : false
+        showDebugMsgs : false,
+        newInstanceCockpitUseTlsProxy : true
 
     }
 });

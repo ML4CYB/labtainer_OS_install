@@ -146,6 +146,7 @@ mounts:
             , clientUuid = uuid
             , clientCurrentTime = currentTime
             , showDebugMsgs = showDebugMsgs
+            , newInstanceCockpitUseTlsProxy = flags.newInstanceCockpitUseTlsProxy
             }
 
         -- This only gets used if we do not find a client UUID in stored state

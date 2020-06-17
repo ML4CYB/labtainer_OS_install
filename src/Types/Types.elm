@@ -73,6 +73,7 @@ type alias Flags =
     , randomSeed3 : Int
     , epoch : Int
     , showDebugMsgs : Bool
+    , newInstanceCockpitUseTlsProxy : Bool
     }
 
 
@@ -95,6 +96,7 @@ type alias Model =
     , clientUuid : UUID.UUID
     , clientCurrentTime : Time.Posix
     , showDebugMsgs : Bool
+    , newInstanceCockpitUseTlsProxy : Bool
     }
 
 
