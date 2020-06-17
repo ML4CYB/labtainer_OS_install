@@ -74,6 +74,8 @@ requestCockpitLogin project serverUuid password ipAddress =
     Http.request
         { method = "GET"
         , headers = [ Http.header "Authorization" authHeaderValue ]
+
+        -- TODO use exoCockpitUrl defined in server metadata instead, if we have it
         , url = "http://" ++ ipAddress ++ ":9090/cockpit/login"
         , body = Http.emptyBody
         , expect = Http.expectString (resultMsg project serverUuid)

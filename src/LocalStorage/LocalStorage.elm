@@ -41,7 +41,13 @@ hydrateModelFromStoredState emptyModel newClientUuid storedState =
             emptyModel clientUuid
 
         projects =
-            List.map (hydrateProjectFromStoredProject modelWithClientUuid.globalDefaults.cloudsWithInstanceTlsProxy) storedState.projects
+            List.map
+                (hydrateProjectFromStoredProject
+                    -- TODO this is sloppy factoring, pass a single argument?
+                    modelWithClientUuid.newInstanceCockpitUseTlsProxy
+                    modelWithClientUuid.globalDefaults.cloudsWithInstanceTlsProxy
+                )
+                storedState.projects
 
         viewState =
             case projects of
@@ -63,8 +69,8 @@ hydrateModelFromStoredState emptyModel newClientUuid storedState =
     { modelWithClientUuid | projects = projects, viewState = viewState }
 
 
-hydrateProjectFromStoredProject : Dict.Dict String String -> StoredProject -> Types.Project
-hydrateProjectFromStoredProject cloudsWithInstanceTlsProxy storedProject =
+hydrateProjectFromStoredProject : Bool -> Dict.Dict String String -> StoredProject -> Types.Project
+hydrateProjectFromStoredProject useTlsProxy cloudsWithInstanceTlsProxy storedProject =
     { secret = storedProject.secret
     , auth = storedProject.auth
     , endpoints = storedProject.endpoints
@@ -80,7 +86,13 @@ hydrateProjectFromStoredProject cloudsWithInstanceTlsProxy storedProject =
     , computeQuota = RemoteData.NotAsked
     , volumeQuota = RemoteData.NotAsked
     , pendingCredentialedRequests = []
-    , instanceTlsProxyHostname = Helpers.getInstanceTlsProxyHostname cloudsWithInstanceTlsProxy storedProject.endpoints.keystone
+    , instanceTlsProxyHostname =
+        -- TODO this is sloppy factoring, pass a single argument?
+        if useTlsProxy then
+            Helpers.getInstanceTlsProxyHostname cloudsWithInstanceTlsProxy storedProject.endpoints.keystone
+
+        else
+            Nothing
     }
 
 

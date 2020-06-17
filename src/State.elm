@@ -1557,9 +1557,13 @@ createProject model password authToken endpoints =
             , volumeQuota = RemoteData.NotAsked
             , pendingCredentialedRequests = []
             , instanceTlsProxyHostname =
-                Helpers.getInstanceTlsProxyHostname
-                    model.globalDefaults.cloudsWithInstanceTlsProxy
-                    endpoints.keystone
+                if model.newInstanceCockpitUseTlsProxy then
+                    Helpers.getInstanceTlsProxyHostname
+                        model.globalDefaults.cloudsWithInstanceTlsProxy
+                        endpoints.keystone
+
+                else
+                    Nothing
             }
 
         newProjects =

@@ -2,12 +2,13 @@ module Orchestration.GoalServer exposing (goalNewServer, goalPollServers)
 
 import Helpers.Helpers as Helpers
 import Helpers.RemoteDataPlusPlus as RDPP
+import OpenStack.ServerMetadata exposing (requestCreateServerMetadata)
 import OpenStack.Types as OSTypes
 import Orchestration.Helpers exposing (applyStepToAllServers)
 import Rest.Neutron
 import Rest.Nova
 import Time
-import Types.Types exposing (FloatingIpState(..), Msg, Project, Server)
+import Types.Types exposing (FloatingIpState(..), Msg, Project, Server, ServerFromExoProps, ServerOrigin(..))
 import UUID
 
 
@@ -18,6 +19,7 @@ goalNewServer exoClientUuid time project =
             [ stepServerRequestPorts time
             , stepServerRequestNetworks time
             , stepServerRequestFloatingIp time
+            , stepServerSetMetadataCockpitUrl
             ]
 
         ( newProject, newCmds ) =
@@ -76,20 +78,11 @@ stepServerPoll time project server =
                         infrequentPollIntervalMs
             in
             Time.posixToMillis time < (Time.posixToMillis receivedTime + pollInterval)
-
-        dontPollBecauseServerIsLoading : Bool
-        dontPollBecauseServerIsLoading =
-            case project.servers.refreshStatus of
-                RDPP.Loading _ ->
-                    True
-
-                _ ->
-                    server.exoProps.loadingSeparately
     in
     if serverReceivedRecentlyEnough then
         ( project, Cmd.none )
 
-    else if dontPollBecauseServerIsLoading then
+    else if serverIsLoading project server then
         ( project, Cmd.none )
 
     else
@@ -246,3 +239,89 @@ stepServerRequestFloatingIp _ project server =
 
         _ ->
             ( project, Cmd.none )
+
+
+stepServerSetMetadataCockpitUrl : Project -> Server -> ( Project, Cmd Msg )
+stepServerSetMetadataCockpitUrl project server =
+    let
+        serverNewEnough : Bool
+        serverNewEnough =
+            case server.exoProps.serverOrigin of
+                ServerNotFromExo ->
+                    False
+
+                ServerFromExo exoOriginProps ->
+                    exoOriginProps.exoServerVersion >= 2
+
+        metadataCockpitUrlAlreadySet : Bool
+        metadataCockpitUrlAlreadySet =
+            server.osProps.details.metadata
+                |> List.filter (\i -> i.key == "exoCockpitUrl")
+                |> List.map (\i -> i.value)
+                |> List.isEmpty
+                |> not
+
+        prerequisites : Bool
+        prerequisites =
+            not (serverIsLoading project server)
+                && not server.exoProps.deletionAttempted
+                && serverNewEnough
+                && not metadataCockpitUrlAlreadySet
+
+        serverFloatingIp : Maybe String
+        serverFloatingIp =
+            Helpers.getServerFloatingIp server.osProps.details.ipAddresses
+    in
+    case ( prerequisites, serverFloatingIp ) of
+        ( True, Just floatingIp ) ->
+            let
+                exoCockpitUrl =
+                    case project.instanceTlsProxyHostname of
+                        Nothing ->
+                            "https://" ++ floatingIp ++ ":9090"
+
+                        Just proxyHostname ->
+                            "https://" ++ proxyHostname ++ "/" ++ floatingIp ++ "/9090/"
+
+                otherServerMetadata =
+                    server.osProps.details.metadata
+                        |> List.filter (\i -> i.key /= "exoCockpitUrl")
+
+                -- TODO this is a terrible factoring; it also assumes the metadata POST will succeed.. maybe we need RemoteData/RemoteDataPlusPlus for metadata sooner
+                newServerMetadata =
+                    OSTypes.MetadataItem "exoCockpitUrl" exoCockpitUrl :: otherServerMetadata
+
+                oldServerOSPropsDetails =
+                    server.osProps.details
+
+                newServerOSPropsDetails =
+                    { oldServerOSPropsDetails | metadata = newServerMetadata }
+
+                oldServerOSProps =
+                    server.osProps
+
+                newServerOSProps =
+                    { oldServerOSProps | details = newServerOSPropsDetails }
+
+                newServer =
+                    { server | osProps = newServerOSProps }
+
+                newProject =
+                    Helpers.projectUpdateServer project newServer
+            in
+            ( newProject
+            , requestCreateServerMetadata project server.osProps.uuid "exoCockpitUrl" exoCockpitUrl
+            )
+
+        _ ->
+            ( project, Cmd.none )
+
+
+serverIsLoading : Project -> Server -> Bool
+serverIsLoading p s =
+    case p.servers.refreshStatus of
+        RDPP.Loading _ ->
+            True
+
+        _ ->
+            s.exoProps.loadingSeparately
