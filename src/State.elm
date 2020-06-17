@@ -61,6 +61,7 @@ init flags =
     let
         globalDefaults =
             { shellUserData =
+                -- TODO backslashes escaping backslashes in cloud-init YAML is real ugly, must be a better way to do this.
                 """#cloud-config
 users:
   - default
@@ -85,6 +86,20 @@ runcmd:
       fi
       unset PASSPHRASE
     fi
+  - |
+    # This gets server metadata
+    curl http://169.254.169.254/openstack/latest/meta_data.json > metadata
+    # This pulls Cockpit URL out of server metadata. What do we do if it fails?
+    cockpiturl=$(grep -ioP "\\"exoCockpitUrl\\": \\"\\K(.*?)(?=\\")" metadata)
+    proxyhostname=$(echo $cockpiturl | grep -ioP "https://\\K(.*?)(?=/(.*))")
+    proxyurlpath=$(echo $cockpiturl | grep -ioP "https://(.*?)\\K/(.*)(?=/)")
+
+    cat >/etc/cockpit/cockpit.conf << EOL
+    [WebService]
+    Origins = https://${proxyhostname} wss://${proxyhostname}
+    ProtocolHeader = X-Forwarded-Proto
+    UrlRoot=${proxyurlpath}
+    EOL
   - systemctl enable cockpit.socket
   - systemctl start cockpit.socket
   - systemctl daemon-reload
