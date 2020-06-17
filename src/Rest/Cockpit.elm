@@ -74,7 +74,7 @@ requestCockpitLogin project serverUuid password cockpitUrl =
     Http.request
         { method = "GET"
         , headers = [ Http.header "Authorization" authHeaderValue ]
-        , url = cockpitUrl
+        , url = cockpitUrl ++ "/cockpit/login"
         , body = Http.emptyBody
         , expect = Http.expectString (resultMsg project serverUuid)
         , timeout = Just 3000
