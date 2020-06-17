@@ -36,25 +36,25 @@ requestCockpitIfRequestable project server =
        - Cockpit status is not Ready
     -}
     let
-        maybeFloatingIp =
-            Helpers.getServerFloatingIp server.osProps.details.ipAddresses
+        maybeCockpitUrl =
+            Helpers.getServerCockpitUrl server
 
         maybeExouserPassword =
             Helpers.getServerExouserPassword server.osProps.details
     in
     case
         ( server.exoProps.serverOrigin
-        , maybeFloatingIp
+        , maybeCockpitUrl
         , maybeExouserPassword
         )
     of
-        ( ServerFromExo exoOriginProps, Just floatingIp, Just password ) ->
+        ( ServerFromExo exoOriginProps, Just cockpitUrl, Just password ) ->
             case exoOriginProps.cockpitStatus of
                 Ready ->
                     Cmd.none
 
                 _ ->
-                    requestCockpitLogin project server.osProps.uuid password floatingIp
+                    requestCockpitLogin project server.osProps.uuid password cockpitUrl
 
         _ ->
             -- Maybe in the future show an error here? Missing floating IP or password?
@@ -62,7 +62,7 @@ requestCockpitIfRequestable project server =
 
 
 requestCockpitLogin : Project -> OSTypes.ServerUuid -> String -> String -> Cmd Msg
-requestCockpitLogin project serverUuid password ipAddress =
+requestCockpitLogin project serverUuid password cockpitUrl =
     let
         authHeaderValue =
             "Basic " ++ Base64.encode ("exouser:" ++ password)
@@ -74,9 +74,7 @@ requestCockpitLogin project serverUuid password ipAddress =
     Http.request
         { method = "GET"
         , headers = [ Http.header "Authorization" authHeaderValue ]
-
-        -- TODO use exoCockpitUrl defined in server metadata instead, if we have it
-        , url = "http://" ++ ipAddress ++ ":9090/cockpit/login"
+        , url = cockpitUrl
         , body = Http.emptyBody
         , expect = Http.expectString (resultMsg project serverUuid)
         , timeout = Just 3000

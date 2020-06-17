@@ -7,6 +7,7 @@ module Helpers.Helpers exposing
     , getExternalNetwork
     , getInstanceTlsProxyHostname
     , getProjectId
+    , getServerCockpitUrl
     , getServerExouserPassword
     , getServerFloatingIp
     , getServerUiStatus
@@ -1105,3 +1106,20 @@ serverNeedsFrequentPoll server =
 
         _ ->
             True
+
+
+getServerCockpitUrl : Server -> Maybe String
+getServerCockpitUrl server =
+    case
+        server.osProps.details.metadata
+            |> List.filter (\i -> i.key == "exoCockpitUrl")
+            |> List.map .value
+            |> List.head
+    of
+        Just cockpitUrl ->
+            Just cockpitUrl
+
+        Nothing ->
+            getServerFloatingIp server.osProps.details.ipAddresses
+                |> Maybe.map
+                    (\ip -> "http://" ++ ip ++ ":9090/cockpit/login")

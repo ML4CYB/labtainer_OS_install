@@ -171,6 +171,9 @@ serverDetail appIsElectron project serverUuid serverDetailViewParams =
                     maybeFloatingIp =
                         Helpers.getServerFloatingIp details.ipAddresses
 
+                    maybeCockpitUrl =
+                        Helpers.getServerCockpitUrl server
+
                     projectId =
                         Helpers.getProjectId project
                 in
@@ -237,13 +240,13 @@ serverDetail appIsElectron project serverUuid serverDetailViewParams =
                         , Element.el VH.heading3 (Element.text "Console")
                         , consoleLink appIsElectron project server serverUuid serverDetailViewParams
                         , Element.el VH.heading3 (Element.text "Terminal / Dashboard")
-                        , cockpitInteraction server.exoProps.serverOrigin maybeFloatingIp
+                        , cockpitInteraction server.exoProps.serverOrigin maybeCockpitUrl
                         ]
                     , Element.column (Element.alignTop :: Element.width (Element.px 585) :: VH.exoColumnAttributes)
                         [ Element.el VH.heading3 (Element.text "Server Actions")
                         , viewServerActions projectId server serverDetailViewParams
                         , Element.el VH.heading3 (Element.text "System Resource Usage")
-                        , resourceUsageGraphs server.exoProps.serverOrigin maybeFloatingIp
+                        , resourceUsageGraphs server.exoProps.serverOrigin maybeCockpitUrl
                         ]
                     ]
             )
@@ -467,11 +470,11 @@ consoleLink appIsElectron project server serverUuid serverDetailViewParams =
 
 
 cockpitInteraction : ServerOrigin -> Maybe String -> Element.Element Msg
-cockpitInteraction serverOrigin maybeFloatingIp =
-    maybeFloatingIp
+cockpitInteraction serverOrigin maybeCockpitUrl =
+    maybeCockpitUrl
         |> Maybe.withDefault (Element.text "Server Dashboard and Terminal not ready yet.")
         << Maybe.map
-            (\floatingIp ->
+            (\cockpitUrl ->
                 case serverOrigin of
                     ServerNotFromExo ->
                         Element.text "Not available (server launched outside of Exosphere)."
@@ -486,9 +489,8 @@ cockpitInteraction serverOrigin maybeFloatingIp =
                                             []
                                             (Just <|
                                                 OpenNewWindow <|
-                                                    "https://"
-                                                        ++ floatingIp
-                                                        ++ ":9090/cockpit/@localhost/system/terminal.html"
+                                                    cockpitUrl
+                                                        ++ "/cockpit/@localhost/system/terminal.html"
                                             )
                                             "Type commands in a shell!"
                                         ]
@@ -498,9 +500,7 @@ cockpitInteraction serverOrigin maybeFloatingIp =
                                             []
                                             (Just <|
                                                 OpenNewWindow <|
-                                                    "https://"
-                                                        ++ floatingIp
-                                                        ++ ":9090"
+                                                    cockpitUrl
                                             )
                                             "Server Dashboard"
                                         ]
@@ -661,11 +661,11 @@ renderConfirmationButton serverAction actionMsg cancelMsg title =
 
 
 resourceUsageGraphs : ServerOrigin -> Maybe String -> Element.Element Msg
-resourceUsageGraphs serverOrigin maybeFloatingIp =
-    maybeFloatingIp
+resourceUsageGraphs serverOrigin maybeCockpitUrl =
+    maybeCockpitUrl
         |> Maybe.withDefault (Element.text "Graphs not ready yet.")
         << Maybe.map
-            (\floatingIp ->
+            (\cockpitUrl ->
                 case serverOrigin of
                     ServerNotFromExo ->
                         Element.text "Not available (server launched outside of Exosphere)."
@@ -675,7 +675,7 @@ resourceUsageGraphs serverOrigin maybeFloatingIp =
                             graphs =
                                 let
                                     graphsUrl =
-                                        "https://" ++ floatingIp ++ ":9090/cockpit/@localhost/system/index.html"
+                                        cockpitUrl ++ "/cockpit/@localhost/system/index.html"
                                 in
                                 -- I am so sorry
                                 Element.html
