@@ -4,6 +4,7 @@ module LocalStorage.LocalStorage exposing
     , hydrateModelFromStoredState
     )
 
+import Dict
 import Helpers.Helpers as Helpers
 import Helpers.RemoteDataPlusPlus as RDPP
 import Json.Decode as Decode
@@ -36,8 +37,11 @@ generateStoredProject project =
 hydrateModelFromStoredState : (UUID.UUID -> Types.Model) -> UUID.UUID -> StoredState -> Types.Model
 hydrateModelFromStoredState emptyModel newClientUuid storedState =
     let
+        modelWithClientUuid =
+            emptyModel clientUuid
+
         projects =
-            List.map hydrateProjectFromStoredProject storedState.projects
+            List.map (hydrateProjectFromStoredProject modelWithClientUuid.globalDefaults.cloudsWithInstanceTlsProxy) storedState.projects
 
         viewState =
             case projects of
@@ -55,15 +59,12 @@ hydrateModelFromStoredState emptyModel newClientUuid storedState =
 
                 Nothing ->
                     newClientUuid
-
-        modelWithClientUuid =
-            emptyModel clientUuid
     in
     { modelWithClientUuid | projects = projects, viewState = viewState }
 
 
-hydrateProjectFromStoredProject : StoredProject -> Types.Project
-hydrateProjectFromStoredProject storedProject =
+hydrateProjectFromStoredProject : Dict.Dict String String -> StoredProject -> Types.Project
+hydrateProjectFromStoredProject cloudsWithInstanceTlsProxy storedProject =
     { secret = storedProject.secret
     , auth = storedProject.auth
     , endpoints = storedProject.endpoints
@@ -79,6 +80,7 @@ hydrateProjectFromStoredProject storedProject =
     , computeQuota = RemoteData.NotAsked
     , volumeQuota = RemoteData.NotAsked
     , pendingCredentialedRequests = []
+    , instanceTlsProxyHostname = Helpers.getInstanceTlsProxyHostname cloudsWithInstanceTlsProxy storedProject.endpoints.keystone
     }
 
 

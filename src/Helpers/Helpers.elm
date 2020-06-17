@@ -5,6 +5,7 @@ module Helpers.Helpers exposing
     , flavorLookup
     , getBootVol
     , getExternalNetwork
+    , getInstanceTlsProxyHostname
     , getProjectId
     , getServerExouserPassword
     , getServerFloatingIp
@@ -289,6 +290,13 @@ hostnameFromUrl urlStr =
 
         Nothing ->
             "placeholder-url-unparseable"
+
+
+getInstanceTlsProxyHostname : Dict.Dict String String -> String -> Maybe String
+getInstanceTlsProxyHostname cloudsWithInstanceTlsProxy keystoneHostname =
+    keystoneHostname
+        |> hostnameFromUrl
+        |> (\hostname -> Dict.get hostname cloudsWithInstanceTlsProxy)
 
 
 titleFromHostname : String -> String

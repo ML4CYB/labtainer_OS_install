@@ -43,6 +43,7 @@ module Types.Types exposing
     , currentExoServerVersion
     )
 
+import Dict
 import Helpers.Error exposing (ErrorContext, HttpErrorWithBody)
 import Helpers.RemoteDataPlusPlus as RDPP
 import Http
@@ -106,6 +107,7 @@ type alias LogMessage =
 
 type alias GlobalDefaults =
     { shellUserData : String
+    , cloudsWithInstanceTlsProxy : Dict.Dict String String -- key is hostname of Keystone URL, value is proxy hostname
     }
 
 
@@ -141,6 +143,7 @@ type alias Project =
     , computeQuota : WebData OSTypes.ComputeQuota
     , volumeQuota : WebData OSTypes.VolumeQuota
     , pendingCredentialedRequests : List (OSTypes.AuthTokenString -> Cmd Msg) -- Requests waiting for a valid auth token
+    , instanceTlsProxyHostname : Maybe String
     }
 
 

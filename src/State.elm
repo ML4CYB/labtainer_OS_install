@@ -1,6 +1,7 @@
 module State exposing (init, subscriptions, update)
 
 import Browser.Events
+import Dict
 import Helpers.Error as Error exposing (ErrorContext, ErrorLevel(..))
 import Helpers.Helpers as Helpers
 import Helpers.Random as RandomHelpers
@@ -115,6 +116,11 @@ mounts:
   - [ /dev/vdj, /media/volume/vdj ]
   - [ /dev/vdk, /media/volume/vdk ]
 """
+            , cloudsWithInstanceTlsProxy =
+                Dict.fromList
+                    [ ( "iu.jetstream-cloud.org", "proxy-j7m-iu.exosphere.app" )
+                    , ( "tacc.jetstream-cloud.org", "proxy-j7m-tacc.exosphere.app" )
+                    ]
             }
 
         currentTime =
@@ -1549,6 +1555,10 @@ createProject model password authToken endpoints =
             , computeQuota = RemoteData.NotAsked
             , volumeQuota = RemoteData.NotAsked
             , pendingCredentialedRequests = []
+            , instanceTlsProxyHostname =
+                Helpers.getInstanceTlsProxyHostname
+                    model.globalDefaults.cloudsWithInstanceTlsProxy
+                    endpoints.keystone
             }
 
         newProjects =
