@@ -1122,4 +1122,4 @@ getServerCockpitUrl server =
         Nothing ->
             getServerFloatingIp server.osProps.details.ipAddresses
                 |> Maybe.map
-                    (\ip -> "http://" ++ ip ++ ":9090/cockpit/login")
+                    (\ip -> "https://" ++ ip ++ ":9090")
