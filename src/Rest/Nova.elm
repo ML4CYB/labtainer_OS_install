@@ -431,7 +431,7 @@ receiveServers model project osServers =
     let
         ( newExoServers, cmds ) =
             osServers
-                |> List.map (receiveServer_ project)
+                |> List.map (receiveServer_ project model.isElectron)
                 |> List.unzip
 
         newExoServersClearSomeExoProps =
@@ -482,7 +482,7 @@ receiveServer : Model -> Project -> OSTypes.Server -> ( Model, Cmd Msg )
 receiveServer model project osServer =
     let
         ( newServer, cmd ) =
-            receiveServer_ project osServer
+            receiveServer_ project model.isElectron osServer
 
         newServerUpdatedSomeExoProps =
             let
@@ -516,8 +516,8 @@ receiveServer model project osServer =
     )
 
 
-receiveServer_ : Project -> OSTypes.Server -> ( Server, Cmd Msg )
-receiveServer_ project osServer =
+receiveServer_ : Project -> Bool -> OSTypes.Server -> ( Server, Cmd Msg )
+receiveServer_ project isElectron osServer =
     let
         newServer =
             case Helpers.serverLookup project osServer.uuid of
@@ -594,7 +594,7 @@ receiveServer_ project osServer =
                             Cmd.none
 
         cockpitLoginCmd =
-            requestCockpitIfRequestable project newServer
+            requestCockpitIfRequestable project newServer isElectron
 
         allCmds =
             [ consoleUrlCmd, passwordCmd, cockpitLoginCmd ]

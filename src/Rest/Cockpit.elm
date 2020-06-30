@@ -28,8 +28,8 @@ import Types.Types
 {- HTTP Requests -}
 
 
-requestCockpitIfRequestable : Project -> Server -> Cmd Msg
-requestCockpitIfRequestable project server =
+requestCockpitIfRequestable : Project -> Server -> Bool -> Cmd Msg
+requestCockpitIfRequestable project server isElectron =
     {- Try to log into Cockpit IF:
        - server was launched from Exosphere
        - we have a floating IP address and exouser password
@@ -54,32 +54,41 @@ requestCockpitIfRequestable project server =
                     Cmd.none
 
                 _ ->
-                    requestCockpitLogin project server.osProps.uuid password cockpitUrl
+                    requestCockpitLogin project server.osProps.uuid password cockpitUrl isElectron
 
         _ ->
             -- Maybe in the future show an error here? Missing floating IP or password?
             Cmd.none
 
 
-requestCockpitLogin : Project -> OSTypes.ServerUuid -> String -> String -> Cmd Msg
-requestCockpitLogin project serverUuid password cockpitUrl =
+requestCockpitLogin : Project -> OSTypes.ServerUuid -> String -> String -> Bool -> Cmd Msg
+requestCockpitLogin project serverUuid password cockpitUrl isElectron =
     let
         authHeaderValue =
             "Basic " ++ Base64.encode ("exouser:" ++ password)
 
         resultMsg project2 serverUuid2 result =
             ProjectMsg (Helpers.getProjectId project2) (ReceiveCockpitLoginStatus serverUuid2 result)
+
+        requestParams =
+            { method = "GET"
+            , headers = [ Http.header "Authorization" authHeaderValue ]
+            , url = cockpitUrl ++ "/cockpit/login"
+            , body = Http.emptyBody
+            , expect = Http.expectString (resultMsg project serverUuid)
+            , timeout = Just 3000
+            , tracker = Nothing
+            }
     in
     -- Future todo handle errors with this API call, e.g. a timeout should not generate error to user but other errors should be handled differently
-    Http.riskyRequest
-        { method = "GET"
-        , headers = [ Http.header "Authorization" authHeaderValue ]
-        , url = cockpitUrl ++ "/cockpit/login"
-        , body = Http.emptyBody
-        , expect = Http.expectString (resultMsg project serverUuid)
-        , timeout = Just 3000
-        , tracker = Nothing
-        }
+    -- Electron doesn't appear to respect the withCredentials option
+    -- https://github.com/electron/electron/issues/9356
+    -- CORS works differently between Electron and the browser
+    if isElectron then
+        Http.request requestParams
+
+    else
+        Http.riskyRequest requestParams
 
 
 
