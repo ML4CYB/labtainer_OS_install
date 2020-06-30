@@ -1,5 +1,8 @@
 module View.Servers exposing (serverDetail, servers)
 
+-- import Html
+-- import Html.Attributes
+
 import Color
 import Element
 import Element.Border as Border
@@ -13,8 +16,6 @@ import Framework.Modifier as Modifier
 import Framework.Spinner as Spinner
 import Helpers.Helpers as Helpers
 import Helpers.RemoteDataPlusPlus as RDPP
-import Html
-import Html.Attributes
 import OpenStack.ServerActions as ServerActions
 import OpenStack.Types as OSTypes
 import RemoteData
@@ -245,8 +246,9 @@ serverDetail appIsElectron project serverUuid serverDetailViewParams =
                     , Element.column (Element.alignTop :: Element.width (Element.px 585) :: VH.exoColumnAttributes)
                         [ Element.el VH.heading3 (Element.text "Server Actions")
                         , viewServerActions projectId server serverDetailViewParams
-                        , Element.el VH.heading3 (Element.text "System Resource Usage")
-                        , resourceUsageGraphs server.exoProps.serverOrigin maybeCockpitUrl
+
+                        -- , Element.el VH.heading3 (Element.text "System Resource Usage")
+                        -- , resourceUsageGraphs server.exoProps.serverOrigin maybeCockpitUrl
                         ]
                     ]
             )
@@ -660,60 +662,63 @@ renderConfirmationButton serverAction actionMsg cancelMsg title =
         ]
 
 
-resourceUsageGraphs : ServerOrigin -> Maybe String -> Element.Element Msg
-resourceUsageGraphs serverOrigin maybeCockpitUrl =
-    maybeCockpitUrl
-        |> Maybe.withDefault (Element.text "Graphs not ready yet.")
-        << Maybe.map
-            (\cockpitUrl ->
-                case serverOrigin of
-                    ServerNotFromExo ->
-                        Element.text "Not available (server launched outside of Exosphere)."
 
-                    ServerFromExo serverFromExoProps ->
-                        let
-                            graphs =
-                                let
-                                    graphsUrl =
-                                        cockpitUrl ++ "/cockpit/@localhost/system/index.html"
-                                in
-                                -- I am so sorry
-                                Element.html
-                                    (Html.div
-                                        [ Html.Attributes.style "position" "relative"
-                                        , Html.Attributes.style "overflow" "hidden"
-                                        , Html.Attributes.style "width" "550px"
-                                        , Html.Attributes.style "height" "650px"
-                                        ]
-                                        [ Html.iframe
-                                            [ Html.Attributes.style "position" "absolute"
-                                            , Html.Attributes.style "top" "-320px"
-                                            , Html.Attributes.style "left" "-30px"
-                                            , Html.Attributes.style "width" "600px"
-                                            , Html.Attributes.style "height" "1000px"
+{-
+   resourceUsageGraphs : ServerOrigin -> Maybe String -> Element.Element Msg
+   resourceUsageGraphs serverOrigin maybeCockpitUrl =
+       maybeCockpitUrl
+           |> Maybe.withDefault (Element.text "Graphs not ready yet.")
+           << Maybe.map
+               (\cockpitUrl ->
+                   case serverOrigin of
+                       ServerNotFromExo ->
+                           Element.text "Not available (server launched outside of Exosphere)."
 
-                                            -- https://stackoverflow.com/questions/15494568/html-iframe-disable-scroll
-                                            -- This is not compliant HTML5 but still works
-                                            , Html.Attributes.attribute "scrolling" "no"
-                                            , Html.Attributes.src graphsUrl
-                                            ]
-                                            []
-                                        ]
-                                    )
-                        in
-                        case serverFromExoProps.cockpitStatus of
-                            Ready ->
-                                graphs
+                       ServerFromExo serverFromExoProps ->
+                           let
+                               graphs =
+                                   let
+                                       graphsUrl =
+                                           cockpitUrl ++ "/cockpit/@localhost/system/index.html"
+                                   in
+                                   -- I am so sorry
+                                   Element.html
+                                       (Html.div
+                                           [ Html.Attributes.style "position" "relative"
+                                           , Html.Attributes.style "overflow" "hidden"
+                                           , Html.Attributes.style "width" "550px"
+                                           , Html.Attributes.style "height" "650px"
+                                           ]
+                                           [ Html.iframe
+                                               [ Html.Attributes.style "position" "absolute"
+                                               , Html.Attributes.style "top" "-320px"
+                                               , Html.Attributes.style "left" "-30px"
+                                               , Html.Attributes.style "width" "600px"
+                                               , Html.Attributes.style "height" "1000px"
 
-                            ReadyButRecheck ->
-                                graphs
+                                               -- https://stackoverflow.com/questions/15494568/html-iframe-disable-scroll
+                                               -- This is not compliant HTML5 but still works
+                                               , Html.Attributes.attribute "scrolling" "no"
+                                               , Html.Attributes.src graphsUrl
+                                               ]
+                                               []
+                                           ]
+                                       )
+                           in
+                           case serverFromExoProps.cockpitStatus of
+                               Ready ->
+                                   graphs
 
-                            NotChecked ->
-                                Element.text "Graphs not ready yet."
+                               ReadyButRecheck ->
+                                   graphs
 
-                            CheckedNotReady ->
-                                Element.text "Graphs not ready yet."
-            )
+                               NotChecked ->
+                                   Element.text "Graphs not ready yet."
+
+                               CheckedNotReady ->
+                                   Element.text "Graphs not ready yet."
+               )
+-}
 
 
 renderServer : Project -> ServerFilter -> List DeleteConfirmation -> Server -> Element.Element Msg
