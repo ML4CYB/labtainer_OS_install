@@ -71,7 +71,7 @@ requestCockpitLogin project serverUuid password cockpitUrl =
             ProjectMsg (Helpers.getProjectId project2) (ReceiveCockpitLoginStatus serverUuid2 result)
     in
     -- Future todo handle errors with this API call, e.g. a timeout should not generate error to user but other errors should be handled differently
-    Http.request
+    Http.riskyRequest
         { method = "GET"
         , headers = [ Http.header "Authorization" authHeaderValue ]
         , url = cockpitUrl ++ "/cockpit/login"
