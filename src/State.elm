@@ -88,10 +88,17 @@ runcmd:
     fi
   - |
     # This gets server metadata
+    while true; do
     curl http://169.254.169.254/openstack/latest/meta_data.json > metadata
     # This pulls Cockpit URL out of server metadata. What do we do if it fails?
     cockpiturl=$(grep -ioP "\\"exoCockpitUrl\\": \\"\\K(.*?)(?=\\")" metadata)
+    if [[ $cockpiturl != "" ]]; then
+    break
+    fi
+    sleep 8
+    done
     proxyhostname=$(echo $cockpiturl | grep -ioP "https://\\K(.*?)(?=/(.*))")
+    if [[ $proxyhostname != "" ]]; then
     proxyurlpath=$(echo $cockpiturl | grep -ioP "https://(.*?)\\K/(.*)")/
 
     cat >/etc/cockpit/cockpit.conf << EOL
@@ -100,6 +107,7 @@ runcmd:
     ProtocolHeader = X-Forwarded-Proto
     UrlRoot=${proxyurlpath}
     EOL
+    fi
   - systemctl enable cockpit.socket
   - systemctl start cockpit.socket
   - systemctl daemon-reload
