@@ -92,7 +92,7 @@ runcmd:
     # This pulls Cockpit URL out of server metadata. What do we do if it fails?
     cockpiturl=$(grep -ioP "\\"exoCockpitUrl\\": \\"\\K(.*?)(?=\\")" metadata)
     proxyhostname=$(echo $cockpiturl | grep -ioP "https://\\K(.*?)(?=/(.*))")
-    proxyurlpath=$(echo $cockpiturl | grep -ioP "https://(.*?)\\K/(.*)(?=/)")
+    proxyurlpath=$(echo $cockpiturl | grep -ioP "https://(.*?)\\K/(.*)")/
 
     cat >/etc/cockpit/cockpit.conf << EOL
     [WebService]
