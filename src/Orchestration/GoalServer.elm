@@ -281,7 +281,7 @@ stepServerSetMetadataCockpitUrl project server =
                             "https://" ++ floatingIp ++ ":9090"
 
                         Just proxyHostname ->
-                            "https://" ++ proxyHostname ++ "/" ++ floatingIp ++ "/9090/"
+                            "https://" ++ proxyHostname ++ "/" ++ floatingIp ++ "/9090"
 
                 otherServerMetadata =
                     server.osProps.details.metadata
