@@ -72,7 +72,16 @@ requestCockpitLogin project serverUuid password cockpitUrl isElectron =
 
         requestParams =
             { method = "GET"
-            , headers = [ Http.header "Authorization" authHeaderValue ]
+            , headers =
+                [ Http.header "Authorization" authHeaderValue
+                , Http.header "X-Is-Electron"
+                    (if isElectron then
+                        "true"
+
+                     else
+                        "false"
+                    )
+                ]
             , url = cockpitUrl ++ "/cockpit/login"
             , body = Http.emptyBody
             , expect = Http.expectString (resultMsg project serverUuid)
