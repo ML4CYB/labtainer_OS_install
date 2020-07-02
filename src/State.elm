@@ -90,7 +90,6 @@ runcmd:
     # This gets server metadata
     while true; do
     curl http://169.254.169.254/openstack/latest/meta_data.json > metadata
-    # This pulls Cockpit URL out of server metadata. What do we do if it fails?
     cockpiturl=$(grep -ioP "\\"exoCockpitUrl\\": \\"\\K(.*?)(?=\\")" metadata)
     if [[ $cockpiturl != "" ]]; then
     break
