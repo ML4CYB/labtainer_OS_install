@@ -91,13 +91,13 @@ runcmd:
     while true; do
     curl http://169.254.169.254/openstack/latest/meta_data.json > metadata
     cockpiturl=$(grep -ioP "\\"exoCockpitUrl\\": \\"\\K(.*?)(?=\\")" metadata)
-    if [[ $cockpiturl != "" ]]; then
+    if [ "$cockpiturl" != "" ]; then
     break
     fi
     sleep 8
     done
     proxyhostname=$(echo $cockpiturl | grep -ioP "https://\\K(.*?)(?=/(.*))")
-    if [[ $proxyhostname != "" ]]; then
+    if [ "$proxyhostname" != "" ]; then
     proxyurlpath=$(echo $cockpiturl | grep -ioP "https://(.*?)\\K/(.*)")/
 
     cat >/etc/cockpit/cockpit.conf << EOL
