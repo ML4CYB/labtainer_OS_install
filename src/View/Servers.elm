@@ -169,9 +169,6 @@ serverDetail appIsElectron project serverUuid serverDetailViewParams =
                     maybeFloatingIp =
                         Helpers.getServerFloatingIp details.ipAddresses
 
-                    maybeCockpitUrl =
-                        Helpers.getServerCockpitUrl server
-
                     projectId =
                         Helpers.getProjectId project
                 in
@@ -236,9 +233,11 @@ serverDetail appIsElectron project serverUuid serverDetailViewParams =
                         , Element.el VH.heading3 (Element.text "SSH")
                         , sshInstructions maybeFloatingIp
                         , Element.el VH.heading3 (Element.text "Console")
-                        , consoleLink appIsElectron project server serverUuid serverDetailViewParams
+                        , consoleLink appIsElectron server
                         , Element.el VH.heading3 (Element.text "Terminal / Dashboard")
-                        , cockpitInteraction server.exoProps.serverOrigin maybeCockpitUrl
+                        , cockpitInteraction server
+                        , Element.el VH.heading3 (Element.text "Server Credentials")
+                        , viewServerUsernamePassword project server serverDetailViewParams
                         ]
                     , Element.column (Element.alignTop :: Element.width (Element.px 585) :: VH.exoColumnAttributes)
                         [ Element.el VH.heading3 (Element.text "Server Actions")
@@ -375,13 +374,9 @@ sshInstructions maybeFloatingIp =
             copyableText ("exouser@" ++ floatingIp)
 
 
-consoleLink : Bool -> Project -> Server -> OSTypes.ServerUuid -> ServerDetailViewParams -> Element.Element Msg
-consoleLink appIsElectron project server serverUuid serverDetailViewParams =
-    let
-        details =
-            server.osProps.details
-    in
-    case details.openstackStatus of
+consoleLink : Bool -> Server -> Element.Element Msg
+consoleLink appIsElectron server =
+    case server.osProps.details.openstackStatus of
         OSTypes.ServerActive ->
             case server.osProps.consoleUrl of
                 RemoteData.NotAsked ->
@@ -397,64 +392,17 @@ consoleLink appIsElectron project server serverUuid serverDetailViewParams =
                         ]
 
                 RemoteData.Success consoleUrl ->
-                    let
-                        flippyCardContents : PasswordVisibility -> Element.Element Msg -> Element.Element Msg
-                        flippyCardContents pwVizOnClick contents =
-                            Element.el
-                                [ Events.onClick
-                                    (ProjectMsg (Helpers.getProjectId project) <|
-                                        SetProjectView <|
-                                            ServerDetail serverUuid
-                                                { serverDetailViewParams | passwordVisibility = pwVizOnClick }
-                                    )
-                                , Element.centerX
-                                , Element.centerY
-                                , Element.height Element.fill
-                                , Element.width Element.fill
-                                ]
-                                (Element.el
-                                    [ Element.centerX ]
-                                    contents
-                                )
-
-                        passwordFlippyCard password =
-                            Card.flipping
-                                { width = 550
-                                , height = 30
-                                , activeFront =
-                                    case serverDetailViewParams.passwordVisibility of
-                                        PasswordShown ->
-                                            False
-
-                                        PasswordHidden ->
-                                            True
-                                , front = flippyCardContents PasswordShown <| Element.text "(click to view password)"
-                                , back = flippyCardContents PasswordHidden <| copyableText password
-                                }
-
-                        passwordHint =
-                            Helpers.getServerExouserPassword details
-                                |> Maybe.withDefault Element.none
-                                << Maybe.map
-                                    (\password ->
-                                        Element.column
-                                            [ Element.spacing 10 ]
-                                            [ Element.text "Try logging in with username \"exouser\" and the following password:"
-                                            , passwordFlippyCard password
-                                            ]
-                                    )
-                    in
                     Element.column
                         VH.exoColumnAttributes
                         [ VH.browserLink
                             appIsElectron
                             consoleUrl
-                            (View.Types.BrowserLinkFancyLabel (Button.button [] Nothing "Console"))
+                            (View.Types.BrowserLinkFancyLabel (Button.button [] Nothing "Open Console"))
                         , Element.paragraph []
                             [ Element.text <|
-                                "Launching the console is like connecting a screen, mouse, and keyboard to your server. "
-                                    ++ "If your server has a desktop environment then you can interact with it here."
-                            , passwordHint
+                                "Launching the console is like connecting a display, mouse, and keyboard to your server. "
+                                    ++ "If your server has a desktop environment, you can interact with it here. "
+                                    ++ "Log in with Server Credentials below."
                             ]
                         ]
 
@@ -465,13 +413,13 @@ consoleLink appIsElectron project server serverUuid serverDetailViewParams =
             Element.text "Console not available with server in this state."
 
 
-cockpitInteraction : ServerOrigin -> Maybe String -> Element.Element Msg
-cockpitInteraction serverOrigin maybeCockpitUrl =
-    maybeCockpitUrl
+cockpitInteraction : Server -> Element.Element Msg
+cockpitInteraction server =
+    Helpers.getServerCockpitUrl server
         |> Maybe.withDefault (Element.text "Server Dashboard and Terminal not ready yet.")
         << Maybe.map
             (\cockpitUrl ->
-                case serverOrigin of
+                case server.exoProps.serverOrigin of
                     ServerNotFromExo ->
                         Element.text "Not available (server launched outside of Exosphere)."
 
@@ -479,7 +427,9 @@ cockpitInteraction serverOrigin maybeCockpitUrl =
                         let
                             interaction =
                                 Element.column VH.exoColumnAttributes
-                                    [ Element.text "Server Dashboard and Terminal are ready..."
+                                    [ Element.paragraph []
+                                        [ Element.text "Server Dashboard and Terminal are ready. Log in with Server Credentials below."
+                                        ]
                                     , Element.row VH.exoRowAttributes
                                         [ Button.button
                                             []
@@ -488,7 +438,7 @@ cockpitInteraction serverOrigin maybeCockpitUrl =
                                                     cockpitUrl
                                                         ++ "/cockpit/@localhost/system/terminal.html"
                                             )
-                                            "Type commands in a shell!"
+                                            "Open Terminal (type commands in a shell)"
                                         ]
                                     , Element.row
                                         VH.exoRowAttributes
@@ -498,7 +448,7 @@ cockpitInteraction serverOrigin maybeCockpitUrl =
                                                 OpenNewWindow <|
                                                     cockpitUrl
                                             )
-                                            "Server Dashboard"
+                                            "Open Server Dashboard"
                                         ]
                                     ]
                         in
@@ -963,3 +913,53 @@ serverVolumes project server =
                       }
                     ]
                 }
+
+
+viewServerUsernamePassword : Project -> Server -> ServerDetailViewParams -> Element.Element Msg
+viewServerUsernamePassword project server serverDetailViewParams =
+    let
+        flippyCardContents : PasswordVisibility -> Element.Element Msg -> Element.Element Msg
+        flippyCardContents pwVizOnClick contents =
+            Element.el
+                [ Events.onClick
+                    (ProjectMsg (Helpers.getProjectId project) <|
+                        SetProjectView <|
+                            ServerDetail server.osProps.uuid
+                                { serverDetailViewParams | passwordVisibility = pwVizOnClick }
+                    )
+                , Element.centerX
+                , Element.centerY
+                , Element.height Element.fill
+                , Element.width Element.fill
+                ]
+                (Element.el
+                    [ Element.centerX ]
+                    contents
+                )
+
+        passwordFlippyCard password =
+            Card.flipping
+                { width = 550
+                , height = 30
+                , activeFront =
+                    case serverDetailViewParams.passwordVisibility of
+                        PasswordShown ->
+                            False
+
+                        PasswordHidden ->
+                            True
+                , front = flippyCardContents PasswordShown <| Element.text "(click to view password)"
+                , back = flippyCardContents PasswordHidden <| copyableText password
+                }
+    in
+    Helpers.getServerExouserPassword server.osProps.details
+        |> Maybe.withDefault Element.none
+        << Maybe.map
+            (\password ->
+                Element.column
+                    [ Element.spacing 10 ]
+                    [ Element.text "Username: exouser"
+                    , Element.text "Password:"
+                    , passwordFlippyCard password
+                    ]
+            )
