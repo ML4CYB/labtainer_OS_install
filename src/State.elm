@@ -750,7 +750,7 @@ processProjectSpecificMsg model project msg =
                         _ ->
                             ( project
                                 |> Helpers.projectSetServersLoading model.clientCurrentTime
-                                |> projectResetCockpitStatuses
+                                -- |> projectResetCockpitStatuses
                                 |> Helpers.modelUpdateProject model
                                 |> modelUpdatedView
                             , [ Rest.Nova.requestServers
@@ -769,7 +769,7 @@ processProjectSpecificMsg model project msg =
                         _ ->
                             ( project
                                 |> (\p -> Helpers.projectSetServerLoading p serverUuid)
-                                |> projectResetCockpitStatuses
+                                -- |> projectResetCockpitStatuses
                                 |> Helpers.modelUpdateProject model
                                 |> modelUpdatedView
                             , Cmd.batch
