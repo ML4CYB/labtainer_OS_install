@@ -692,40 +692,42 @@ processProjectSpecificMsg model project msg =
                 modelUpdatedView model_ =
                     { model_ | viewState = ProjectView (Helpers.getProjectId project) { createPopup = False } projectViewConstructor }
 
-                projectResetCockpitStatuses project_ =
-                    -- We need to re-poll Cockpit to determine its availability and get a session cookie
-                    -- See merge request 289
-                    let
-                        serverResetCockpitStatus s =
-                            case s.exoProps.serverOrigin of
-                                ServerNotFromExo ->
-                                    s
+                {-
+                   projectResetCockpitStatuses project_ =
+                       -- We need to re-poll Cockpit to determine its availability and get a session cookie
+                       -- See merge request 289
+                       let
+                           serverResetCockpitStatus s =
+                               case s.exoProps.serverOrigin of
+                                   ServerNotFromExo ->
+                                       s
 
-                                ServerFromExo serverFromExoProps ->
-                                    let
-                                        newCockpitStatus =
-                                            case serverFromExoProps.cockpitStatus of
-                                                Ready ->
-                                                    ReadyButRecheck
+                                   ServerFromExo serverFromExoProps ->
+                                       let
+                                           newCockpitStatus =
+                                               case serverFromExoProps.cockpitStatus of
+                                                   Ready ->
+                                                       ReadyButRecheck
 
-                                                _ ->
-                                                    serverFromExoProps.cockpitStatus
+                                                   _ ->
+                                                       serverFromExoProps.cockpitStatus
 
-                                        newOriginProps =
-                                            ServerFromExo { serverFromExoProps | cockpitStatus = newCockpitStatus }
+                                           newOriginProps =
+                                               ServerFromExo { serverFromExoProps | cockpitStatus = newCockpitStatus }
 
-                                        newExoProps =
-                                            let
-                                                oldExoProps =
-                                                    s.exoProps
-                                            in
-                                            { oldExoProps | serverOrigin = newOriginProps }
-                                    in
-                                    { s | exoProps = newExoProps }
-                    in
-                    RDPP.withDefault [] project_.servers
-                        |> List.map serverResetCockpitStatus
-                        |> List.foldl (\s p -> Helpers.projectUpdateServer p s) project_
+                                           newExoProps =
+                                               let
+                                                   oldExoProps =
+                                                       s.exoProps
+                                               in
+                                               { oldExoProps | serverOrigin = newOriginProps }
+                                       in
+                                       { s | exoProps = newExoProps }
+                       in
+                       RDPP.withDefault [] project_.servers
+                           |> List.map serverResetCockpitStatus
+                           |> List.foldl (\s p -> Helpers.projectUpdateServer p s) project_
+                -}
             in
             case projectViewConstructor of
                 ListImages _ ->
