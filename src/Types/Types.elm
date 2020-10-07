@@ -101,7 +101,7 @@ type alias Model =
     , projects : List Project
     , globalDefaults : GlobalDefaults
     , toasties : Toasty.Stack Toast
-    , openstackApiProxyUrl : Maybe HelperTypes.Url
+    , openstackApiProxyUrl : Maybe OpenstackApiProxyUrl
     , cloudsWithTlsReverseProxy : Dict.Dict String String
     , isElectron : Bool
     , clientUuid : UUID.UUID
@@ -109,6 +109,10 @@ type alias Model =
     , timeZone : Time.Zone
     , showDebugMsgs : Bool
     }
+
+
+type alias OpenstackApiProxyUrl =
+    HelperTypes.Url
 
 
 type alias LogMessage =
