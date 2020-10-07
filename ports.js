@@ -26,7 +26,7 @@ var app = Elm.Exosphere.init({
     {
         // Flags intended to be configured by cloud operators who offer Exosphere
         showDebugMsgs : false,
-        proxyUrl: null,
+        openstackApiProxyUrl: null,
         // Flags that Exosphere sets dynamically
         width: window.innerWidth,
         height: window.innerHeight,

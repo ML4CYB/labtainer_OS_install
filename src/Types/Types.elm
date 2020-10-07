@@ -69,7 +69,7 @@ import UUID
 type alias Flags =
     -- Flags intended to be configured by cloud operators
     { showDebugMsgs : Bool
-    , proxyUrl : Maybe HelperTypes.Url
+    , openstackApiProxyUrl : Maybe HelperTypes.Url
 
     -- Flags that Exosphere sets dynamically
     , width : Int
@@ -99,7 +99,7 @@ type alias Model =
     , projects : List Project
     , globalDefaults : GlobalDefaults
     , toasties : Toasty.Stack Toast
-    , proxyUrl : Maybe HelperTypes.Url
+    , openstackApiProxyUrl : Maybe HelperTypes.Url
     , isElectron : Bool
     , clientUuid : UUID.UUID
     , clientCurrentTime : Time.Posix

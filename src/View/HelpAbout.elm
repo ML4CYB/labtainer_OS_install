@@ -19,7 +19,7 @@ helpAbout model =
             ]
         , Element.el VH.heading2 <| Element.text "App Config Info"
         , Element.paragraph [] <|
-            case model.proxyUrl of
+            case model.openstackApiProxyUrl of
                 Nothing ->
                     [ Element.text "You are not using a proxy server." ]
 
