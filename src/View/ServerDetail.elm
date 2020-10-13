@@ -311,7 +311,7 @@ serverDetail_ project appIsElectron currentTimeAndZone serverDetailViewParams se
             , sshInstructions maybeFloatingIp
             , Element.el VH.heading3 (Element.text "Console")
             , consoleLink projectId appIsElectron serverDetailViewParams server server.osProps.uuid
-            , Element.el VH.heading3 (Element.text "Guacamole Shell/Desktop")
+            , Element.el VH.heading3 (Element.text "Guacamole Terminal/Desktop")
             , guacShell
                 (Tuple.first currentTimeAndZone)
                 project.tlsReverseProxyHostname
@@ -598,7 +598,7 @@ guacShell currentTime tlsReverseProxyHostname server maybeFloatingIp =
                                     ( Just proxyHostname, Just floatingIp ) ->
                                         Widget.textButton
                                             (Widget.Style.Material.outlinedButton Style.Theme.exoPalette)
-                                            { text = "Open Guacamole Shell"
+                                            { text = "Open Guacamole Terminal"
                                             , onPress =
                                                 Just <|
                                                     OpenNewWindow <|
