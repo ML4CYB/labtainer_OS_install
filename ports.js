@@ -27,7 +27,7 @@ var app = Elm.Exosphere.init({
         // Flags intended to be configured by cloud operators who offer Exosphere
         showDebugMsgs: false,
         openstackApiProxyUrl: null,
-        cloudsWithTlsReverseProxy:
+        cloudsWithUserAppProxy:
         [ ["iu.jetstream-cloud.org", "proxy-j7m-iu.exosphere.app"],
           ["tacc.jetstream-cloud.org", "proxy-j7m-tacc.exosphere.app"],
         ],

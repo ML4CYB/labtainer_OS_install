@@ -88,7 +88,7 @@ init flags =
             , projects = []
             , toasties = Toasty.initialState
             , openstackApiProxyUrl = flags.openstackApiProxyUrl
-            , cloudsWithTlsReverseProxy = Dict.fromList flags.cloudsWithTlsReverseProxy
+            , cloudsWithUserAppProxy = Dict.fromList flags.cloudsWithUserAppProxy
             , isElectron = flags.isElectron
             , clientUuid = uuid
             , clientCurrentTime = currentTime
@@ -1760,10 +1760,10 @@ createProject model password authToken endpoints =
             , computeQuota = RemoteData.NotAsked
             , volumeQuota = RemoteData.NotAsked
             , pendingCredentialedRequests = []
-            , tlsReverseProxyHostname =
+            , userAppProxyHostname =
                 endpoints.keystone
                     |> Helpers.hostnameFromUrl
-                    |> (\h -> Dict.get h model.cloudsWithTlsReverseProxy)
+                    |> (\h -> Dict.get h model.cloudsWithUserAppProxy)
             }
 
         newProjects =
