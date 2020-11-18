@@ -141,13 +141,17 @@ projectSpecificUrlPart viewConstructor =
                 , UB.string "imagename" viewParams_.imageName
                 , UB.string "deployguac"
                     (viewParams_.deployGuacamole
-                        |> Maybe.withDefault False
-                        |> (\b ->
-                                if b then
-                                    "true"
+                        |> (\maybeDeployGuac ->
+                                case maybeDeployGuac of
+                                    Just bool ->
+                                        if bool then
+                                            "justtrue"
 
-                                else
-                                    "false"
+                                        else
+                                            "justfalse"
+
+                                    Nothing ->
+                                        "nothing"
                            )
                     )
                 ]
