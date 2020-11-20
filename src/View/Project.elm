@@ -94,7 +94,7 @@ projectNav p viewParams =
                     { text = "My Servers"
                     , onPress =
                         Just <|
-                            ProjectMsg (Helpers.getProjectId p) <|
+                            ProjectMsg p.auth.project.uuid <|
                                 SetProjectView <|
                                     ListProjectServers Defaults.serverListViewParams
                     }
@@ -105,7 +105,7 @@ projectNav p viewParams =
                     (Widget.Style.Material.outlinedButton Style.Theme.exoPalette)
                     { text = "My Volumes"
                     , onPress =
-                        Just <| ProjectMsg (Helpers.getProjectId p) <| SetProjectView <| ListProjectVolumes []
+                        Just <| ProjectMsg p.auth.project.uuid <| SetProjectView <| ListProjectVolumes []
                     }
             , Element.el
                 -- TODO replace these
@@ -115,11 +115,11 @@ projectNav p viewParams =
                     (Widget.Style.Material.textButton Style.Theme.exoPalette)
                     { text = "Remove Project"
                     , onPress =
-                        Just <| ProjectMsg (Helpers.getProjectId p) RemoveProject
+                        Just <| ProjectMsg p.auth.project.uuid RemoveProject
                     }
             , Element.el
                 [ Element.alignRight ]
-                (createButton (Helpers.getProjectId p) viewParams.createPopup)
+                (createButton p.auth.project.uuid viewParams.createPopup)
             ]
         ]
 
