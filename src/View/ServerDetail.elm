@@ -1028,7 +1028,7 @@ serverVolumes style project server =
                                     (SetProjectView <| VolumeDetail v.uuid [])
                                 )
                         , label =
-                            FeatherIcons.arrowRight
+                            FeatherIcons.chevronRight
                                 |> FeatherIcons.withSize 14
                                 |> FeatherIcons.toHtml []
                                 |> Element.html
