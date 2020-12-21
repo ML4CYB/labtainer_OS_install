@@ -1,9 +1,20 @@
 <html>
 
+<!-- config.js contains deployer-specified configuration. Bringing it in early so we can set the base tag -->
+<script type="text/javascript" src="config.js"></script>
+
   <head>
+    <script type="text/javascript">
+    if (config.urlPathPrefix !== null) {
+      var basepath = "/".concat(config.urlPathPrefix).concat("/");
+    } else {
+      var basepath = "/";
+    }
+    document.write("<base href='".concat(basepath).concat("' />"));
+    </script>
+
     <!-- This title will display at the top of your app window -->
     <title>exosphere</title>
-    <base href="/">
     <link rel="stylesheet" href="fonts/open-sans-regular-400.css">
     <link rel="stylesheet" href="assets/css/toasty.css">
     <script src="assets/js/clipboard.min.js"></script>

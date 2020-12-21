@@ -122,7 +122,7 @@ init flags maybeUrlKey =
                 , secondaryColor = secondaryColor
                 , styleMode = Style.Types.LightMode
                 , appTitle =
-                    flags.appTitle |> Maybe.withDefault "exosphere"
+                    flags.appTitle |> Maybe.withDefault "Exosphere"
                 , defaultLoginView = defaultLoginView
                 , aboutAppMarkdown = flags.aboutAppMarkdown
                 }
@@ -181,7 +181,6 @@ init flags maybeUrlKey =
             case maybeUrlKey of
                 Just ( url, _ ) ->
                     AppUrl.Parser.urlToViewState flags.urlPathPrefix url
-                        -- TODO in the future do we want to show "page not found?" Create an issue for this.
                         |> Maybe.withDefault viewStateIfNoUrl
 
                 Nothing ->
