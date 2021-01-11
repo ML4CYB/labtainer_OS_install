@@ -363,7 +363,12 @@ updateUnderlying msg model =
                 ( model, Cmd.none )
 
             else
-                case AppUrl.Parser.urlToViewState model.urlPathPrefix url of
+                case
+                    AppUrl.Parser.urlToViewState
+                        model.urlPathPrefix
+                        (ViewStateHelpers.defaultViewState model)
+                        url
+                of
                     Just newViewState ->
                         ( { model
                             | viewState = newViewState
@@ -374,6 +379,7 @@ updateUnderlying msg model =
 
                     Nothing ->
                         -- URL parsing error
+                        -- TODO show page not found
                         ( model, Cmd.none )
 
         SetStyle styleMode ->
