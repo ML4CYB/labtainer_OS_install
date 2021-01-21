@@ -120,7 +120,6 @@ deploy_jetstream:
     url: https://exosphere.jetstream-cloud.org/exosphere
   only:
     - master
-    - dev
 
 
 deploy_dev:
