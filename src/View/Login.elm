@@ -1,4 +1,4 @@
-module View.Login exposing (viewLoginJetstream, viewLoginOpenstack, viewLoginPicker)
+module View.Login exposing (viewLoginJetstream, viewLoginOIDC, viewLoginOpenstack, viewLoginPicker)
 
 import Color
 import Element
@@ -8,6 +8,7 @@ import Element.Font as Font
 import Element.Input as Input
 import Helpers.Helpers as Helpers
 import OpenStack.Types as OSTypes
+import Rest.Keystone
 import Style.Helpers as SH
 import Style.Types
 import Types.Defaults as Defaults
@@ -71,6 +72,19 @@ viewLoginPicker palette =
                                 Login <|
                                     LoginJetstream <|
                                         JetstreamCreds BothJetstreamClouds "" "" ""
+                    }
+                ]
+            , Element.column VH.exoColumnAttributes
+                [ Element.el
+                    loginTypeLogoAttributes
+                  <|
+                    Element.image [ Element.centerX, Element.width (Element.px 150), Element.height (Element.px 100) ] { src = "assets/img/jetstream-logo.svg", description = "" }
+                , Widget.textButton
+                    (Widget.Style.Material.containedButton (SH.toMaterialPalette palette))
+                    { text = "Log in with OpenID Connect"
+                    , onPress =
+                        Just <|
+                            RequestOIDCLogin
                     }
                 ]
             ]
@@ -326,3 +340,8 @@ jetstreamLoginText model palette =
                 View.Types.BrowserLinkTextLabel "set your TACC password"
             ]
         ]
+
+
+viewLoginOIDC : Model -> Style.Types.ExoPalette -> Element.Element Msg
+viewLoginOIDC model palette =
+    Element.none

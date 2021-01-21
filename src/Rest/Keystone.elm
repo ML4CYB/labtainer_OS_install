@@ -11,6 +11,7 @@ module Rest.Keystone exposing
     , openstackServiceDecoder
     , requestAppCredential
     , requestAuthTokenHelper
+    , requestOIDCLogin
     , requestScopedAuthToken
     , requestUnscopedAuthToken
     , requestUnscopedProjects
@@ -360,7 +361,45 @@ requestUnscopedProjects provider maybeProxyUrl =
         }
 
 
+requestOIDCLogin : Maybe HelperTypes.Url -> Cmd Msg
+requestOIDCLogin mayebProxyUrl =
+    let
+        url_ =
+            "https://iu.jetstream-cloud.org:5000/v3/auth/OS-FEDERATION/websso/openid?origin=https://try-dev.exosphere.app/exosphere/auth/websso"
 
+        ( finalUrl, headers ) =
+            case mayebProxyUrl of
+                Nothing ->
+                    ( url_, [] )
+
+                Just proxyUrl ->
+                    proxyifyRequest proxyUrl url_
+    in
+    Http.request
+        { method = "GET"
+        , headers = headers
+        , url = finalUrl
+        , body = Http.emptyBody
+        , expect =
+            Http.expectStringResponse
+                ReceiveOIDCUrl
+                (\response ->
+                    case response of
+                        Http.GoodStatus_ metadata body ->
+                            Ok ( metadata, body )
+
+                        _ ->
+                            Err "HTTP Error"
+                )
+        , timeout = Nothing
+        , tracker = Nothing
+        }
+
+
+
+{-
+   curl 'https://iu.jetstream-cloud.org:5000/v3/auth/OS-FEDERATION/websso/openid?origin=https://iu.jetstream-cloud.org/auth/websso/' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0' -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8' -H 'Accept-Language: en-US,en;q=0.5' --compressed -H 'Referer: https://iu.jetstream-cloud.org/' -H 'DNT: 1' -H 'Connection: keep-alive' -H 'Cookie: csrftoken=dLGYw7kPBm53TzHVe3WsPmtC4mjjbZGhrvJY9DsPrlDDAXLo1uolvE8rzmKH1EGB' -H 'Upgrade-Insecure-Requests: 1' -H 'Pragma: no-cache' -H 'Cache-Control: no-cache'
+-}
 {- JSON Decoders -}
 
 

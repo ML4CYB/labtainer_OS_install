@@ -95,6 +95,13 @@ projectNonspecificUrlPart buildUrlFunc viewConstructor =
                         -- Not encoding password!
                         ]
 
+                LoginOIDC ->
+                    buildUrlFunc
+                        [ "login"
+                        , "oidc"
+                        ]
+                        []
+
         SelectProjects keystoneUrl _ ->
             buildUrlFunc
                 [ "selectprojs"
