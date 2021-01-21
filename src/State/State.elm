@@ -268,11 +268,7 @@ updateUnderlying msg model =
                     -- Provider not found, may have been removed, nothing to do
                     ( model, Cmd.none )
 
-        ReceiveOIDCUrl result ->
-            let
-                _ =
-                    Debug.log "OIDC result" result
-            in
+        ReceiveOIDCUrl _ ->
             ( model, Cmd.none )
 
         RequestProjectLoginFromProvider keystoneUrl password desiredProjects ->

@@ -8,7 +8,6 @@ import Element.Font as Font
 import Element.Input as Input
 import Helpers.Helpers as Helpers
 import OpenStack.Types as OSTypes
-import Rest.Keystone
 import Style.Helpers as SH
 import Style.Types
 import Types.Defaults as Defaults
@@ -343,5 +342,5 @@ jetstreamLoginText model palette =
 
 
 viewLoginOIDC : Model -> Style.Types.ExoPalette -> Element.Element Msg
-viewLoginOIDC model palette =
+viewLoginOIDC _ _ =
     Element.none
