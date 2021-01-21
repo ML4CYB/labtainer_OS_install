@@ -2,6 +2,7 @@ module State.State exposing (update)
 
 import AppUrl.Builder
 import AppUrl.Parser
+import Browser.Navigation
 import Dict
 import Helpers.ExoSetupStatus
 import Helpers.GetterSetters as GetterSetters
@@ -140,6 +141,12 @@ updateUnderlying msg model =
             in
             ( model, Cmd.batch cmds )
 
+        RequestOIDCLogin ->
+            ( model
+            , Browser.Navigation.load "https://iu.jetstream-cloud.org:5000/v3/auth/OS-FEDERATION/websso/openid?origin=https://try-dev.exosphere.app/exosphere/auth/websso"
+              -- Rest.Keystone.requestOIDCLogin model.cloudCorsProxyUrl
+            )
+
         ReceiveScopedAuthToken maybePassword ( metadata, response ) ->
             case Rest.Keystone.decodeScopedAuthToken <| Http.GoodStatus_ metadata response of
                 Err error ->
@@ -260,6 +267,13 @@ updateUnderlying msg model =
                 Nothing ->
                     -- Provider not found, may have been removed, nothing to do
                     ( model, Cmd.none )
+
+        ReceiveOIDCUrl result ->
+            let
+                _ =
+                    Debug.log "OIDC result" result
+            in
+            ( model, Cmd.none )
 
         RequestProjectLoginFromProvider keystoneUrl password desiredProjects ->
             case GetterSetters.providerLookup model keystoneUrl of

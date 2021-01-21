@@ -251,6 +251,8 @@ type Msg
     | ReceiveUnscopedAuthToken OSTypes.KeystoneUrl HelperTypes.Password ( Http.Metadata, String )
     | ReceiveUnscopedProjects OSTypes.KeystoneUrl (List UnscopedProviderProject)
     | RequestProjectLoginFromProvider OSTypes.KeystoneUrl HelperTypes.Password (List UnscopedProviderProject)
+    | RequestOIDCLogin
+    | ReceiveOIDCUrl (Result String ( Http.Metadata, String ))
     | ProjectMsg ProjectIdentifier ProjectSpecificMsgConstructor
     | InputOpenRc OSTypes.OpenstackLogin String
     | OpenInBrowser String
@@ -343,6 +345,7 @@ type
 type LoginView
     = LoginOpenstack OSTypes.OpenstackLogin
     | LoginJetstream JetstreamCreds
+    | LoginOIDC
 
 
 type alias ImageListViewParams =

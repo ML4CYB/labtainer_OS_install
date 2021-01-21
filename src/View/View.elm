@@ -95,6 +95,9 @@ elementView maybeWindowSize model palette =
                                     LoginJetstream jetstreamCreds ->
                                         View.Login.viewLoginJetstream model palette jetstreamCreds
 
+                                    LoginOIDC ->
+                                        View.Login.viewLoginOIDC model palette
+
                             SelectProjects authUrl selectedProjects ->
                                 View.SelectProjects.selectProjects model palette authUrl selectedProjects
 
