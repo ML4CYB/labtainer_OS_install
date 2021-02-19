@@ -12,8 +12,6 @@ users:
     sudo: ['ALL=(ALL) NOPASSWD:ALL']{ssh-authorized-keys}
 ssh_pwauth: true
 package_update: true
-packages:
-  - cockpit
 runcmd:
   - echo '{"exoSetup":"running"}' > /dev/console
   - |
@@ -27,9 +25,6 @@ runcmd:
         echo exouser:$PASSPHRASE | chpasswd
       fi
     fi
-  - systemctl enable cockpit.socket
-  - systemctl start cockpit.socket
-  - systemctl daemon-reload
   - "mkdir -p /media/volume"
   - "cd /media/volume; for x in b c d e f g h i j k; do mkdir -p sd$x; mkdir -p vd$x; done"
   - "systemctl daemon-reload"
