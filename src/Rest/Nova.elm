@@ -49,8 +49,7 @@ import Rest.Helpers
 import Types.Error exposing (ErrorContext, ErrorLevel(..), HttpErrorWithBody)
 import Types.Types
     exposing
-        ( CockpitLoginStatus(..)
-        , ExoServerProps
+        ( ExoServerProps
         , FloatingIpState(..)
         , HttpRequestMethod(..)
         , Model
