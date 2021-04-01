@@ -13,8 +13,10 @@ module Rest.Nova exposing
     , receiveServer
     , receiveServers
     , requestConsoleUrls
+    , requestCreateKeypair
     , requestCreateServer
     , requestCreateServerImage
+    , requestDeleteKeypair
     , requestDeleteServer
     , requestFlavors
     , requestKeypairs
@@ -38,7 +40,6 @@ import Json.Encode as Encode
 import OpenStack.ServerPassword as OSServerPassword
 import OpenStack.Types as OSTypes
 import RemoteData
-import Rest.Cockpit exposing (requestCockpitIfRequestable)
 import Rest.Helpers
     exposing
         ( expectJsonWithErrorBody
@@ -47,6 +48,7 @@ import Rest.Helpers
         , openstackCredentialedRequest
         , resultToMsgErrorBody
         )
+import Types.Defaults as Defaults
 import Types.Error exposing (ErrorContext, ErrorLevel(..), HttpErrorWithBody)
 import Types.Guacamole as GuacTypes
 import Types.Types
@@ -244,6 +246,64 @@ requestKeypairs project =
         (expectJsonWithErrorBody
             resultToMsg_
             decodeKeypairs
+        )
+
+
+requestCreateKeypair : Project -> OSTypes.KeypairName -> OSTypes.PublicKey -> Cmd Msg
+requestCreateKeypair project keypairName publicKey =
+    let
+        body =
+            Encode.object
+                [ ( "keypair"
+                  , Encode.object
+                        [ ( "name", Encode.string keypairName )
+                        , ( "public_key", Encode.string publicKey )
+                        ]
+                  )
+                ]
+
+        errorContext =
+            ErrorContext
+                ("create keypair for project \"" ++ project.auth.project.name ++ "\"")
+                ErrorCrit
+                (Just "ensure that you are entering the entire public key with no extra line breaks or other characters.")
+
+        resultToMsg_ =
+            resultToMsgErrorBody errorContext
+                (\keypair ->
+                    ProjectMsg project.auth.project.uuid <|
+                        ReceiveCreateKeypair keypair
+                )
+    in
+    openstackCredentialedRequest
+        project
+        Post
+        Nothing
+        (project.endpoints.nova ++ "/os-keypairs")
+        (Http.jsonBody body)
+        (expectJsonWithErrorBody
+            resultToMsg_
+            keypairDecoder
+        )
+
+
+requestDeleteKeypair : Project -> OSTypes.KeypairName -> Cmd Msg
+requestDeleteKeypair project keypairName =
+    let
+        errorContext =
+            ErrorContext
+                ("delete keypair with name \"" ++ keypairName ++ "\"")
+                ErrorCrit
+                Nothing
+    in
+    openstackCredentialedRequest
+        project
+        Delete
+        Nothing
+        (project.endpoints.nova ++ "/os-keypairs/" ++ keypairName)
+        Http.emptyBody
+        (Http.expectWhatever
+            (\result -> ProjectMsg project.auth.project.uuid <| ReceiveDeleteKeypair errorContext keypairName result)
         )
 
 
@@ -531,7 +591,7 @@ receiveServers model project osServers =
     let
         ( newExoServers, cmds ) =
             osServers
-                |> List.map (receiveServer_ (Helpers.appIsElectron model) project)
+                |> List.map (receiveServer_ project)
                 |> List.unzip
 
         newExoServersClearSomeExoProps =
@@ -582,7 +642,7 @@ receiveServer : Model -> Project -> OSTypes.Server -> ( Model, Cmd Msg )
 receiveServer model project osServer =
     let
         ( newServer, cmd ) =
-            receiveServer_ (Helpers.appIsElectron model) project osServer
+            receiveServer_ project osServer
 
         newServerUpdatedSomeExoProps =
             let
@@ -616,8 +676,8 @@ receiveServer model project osServer =
     )
 
 
-receiveServer_ : Bool -> Project -> OSTypes.Server -> ( Server, Cmd Msg )
-receiveServer_ isElectron project osServer =
+receiveServer_ : Project -> OSTypes.Server -> ( Server, Cmd Msg )
+receiveServer_ project osServer =
     let
         newServer : Server
         newServer =
@@ -728,15 +788,8 @@ receiveServer_ isElectron project osServer =
                         _ ->
                             Cmd.none
 
-        cockpitLoginCmd =
-            if isElectron then
-                requestCockpitIfRequestable project newServer
-
-            else
-                Cmd.none
-
         allCmds =
-            [ consoleUrlCmd, passwordCmd, cockpitLoginCmd ]
+            [ consoleUrlCmd, passwordCmd ]
                 |> Cmd.batch
     in
     ( newServer, allCmds )
@@ -813,7 +866,7 @@ receiveFlavors model project flavors =
                                     Just smallestFlavor ->
                                         ProjectView
                                             project.auth.project.uuid
-                                            { createPopup = False }
+                                            Defaults.projectViewParams
                                             (CreateServer
                                                 { viewParams
                                                     | flavorUuid = smallestFlavor.uuid
@@ -842,7 +895,7 @@ receiveKeypairs : Model -> Project -> List OSTypes.Keypair -> ( Model, Cmd Msg )
 receiveKeypairs model project keypairs =
     let
         newProject =
-            { project | keypairs = keypairs }
+            { project | keypairs = RemoteData.Success keypairs }
 
         newModel =
             GetterSetters.modelUpdateProject model newProject

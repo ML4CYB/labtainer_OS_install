@@ -3,7 +3,6 @@ module State.State exposing (update)
 import AppUrl.Builder
 import AppUrl.Parser
 import Browser.Navigation
-import Dict
 import Helpers.ExoSetupStatus
 import Helpers.GetterSetters as GetterSetters
 import Helpers.Helpers as Helpers
@@ -23,7 +22,6 @@ import Orchestration.Orchestration as Orchestration
 import Ports
 import RemoteData
 import Rest.ApiModelHelpers as ApiModelHelpers
-import Rest.Cockpit
 import Rest.Glance
 import Rest.Keystone
 import Rest.Neutron
@@ -112,7 +110,7 @@ updateUnderlying msg model =
             Orchestration.orchModel model posixTime
 
         SetNonProjectView nonProjectViewConstructor ->
-            ViewStateHelpers.setNonProjectView model nonProjectViewConstructor
+            ViewStateHelpers.setNonProjectView nonProjectViewConstructor model
 
         HandleApiErrorWithBody errorContext error ->
             State.Error.processSynchronousApiError model errorContext error
@@ -276,31 +274,30 @@ updateUnderlying msg model =
                                 model.unscopedProviders
 
                         -- If we still have at least one unscoped provider in the model then ask the user to choose projects from it
-                        newViewState =
+                        newViewStateFunc =
                             case List.head newUnscopedProviders of
                                 Just unscopedProvider ->
-                                    NonProjectView <|
-                                        SelectProjects unscopedProvider.authUrl []
+                                    ViewStateHelpers.setNonProjectView
+                                        (SelectProjects unscopedProvider.authUrl [])
 
                                 Nothing ->
                                     -- If we have at least one project then show it, else show the login page
                                     case List.head model.projects of
                                         Just project ->
-                                            ProjectView
-                                                project.auth.project.uuid
-                                                { createPopup = False }
+                                            ViewStateHelpers.setProjectView
+                                                project
                                             <|
-                                                ListProjectServers Defaults.serverListViewParams
+                                                AllResources Defaults.allResourcesListViewParams
 
                                         Nothing ->
-                                            NonProjectView LoginPicker
+                                            ViewStateHelpers.setNonProjectView
+                                                LoginPicker
 
                         modelUpdatedUnscopedProviders =
                             { model | unscopedProviders = newUnscopedProviders }
                     in
                     ( modelUpdatedUnscopedProviders, loginRequests )
-                        |> Helpers.pipelineCmd
-                            (ViewStateHelpers.modelUpdateViewState newViewState)
+                        |> Helpers.pipelineCmd newViewStateFunc
 
                 Nothing ->
                     State.Error.processStringError
@@ -331,9 +328,6 @@ updateUnderlying msg model =
                     NonProjectView <| Login <| LoginOpenstack newCreds
             in
             ViewStateHelpers.modelUpdateViewState newViewState model
-
-        OpenInBrowser url ->
-            ( model, Ports.openInBrowser url )
 
         OpenNewWindow url ->
             ( model, Ports.openNewWindow url )
@@ -429,7 +423,29 @@ processTick model interval time =
                             ( model, Cmd.none )
 
                         Just project ->
+                            let
+                                pollVolumes : ( Model, Cmd Msg )
+                                pollVolumes =
+                                    ( model
+                                    , case interval of
+                                        5 ->
+                                            if List.any volNeedsFrequentPoll (RemoteData.withDefault [] project.volumes) then
+                                                OSVolumes.requestVolumes project
+
+                                            else
+                                                Cmd.none
+
+                                        60 ->
+                                            OSVolumes.requestVolumes project
+
+                                        _ ->
+                                            Cmd.none
+                                    )
+                            in
                             case projectViewState of
+                                AllResources _ ->
+                                    pollVolumes
+
                                 ServerDetail serverUuid _ ->
                                     let
                                         volCmd =
@@ -457,21 +473,7 @@ processTick model interval time =
                                             ( model, Cmd.none )
 
                                 ListProjectVolumes _ ->
-                                    ( model
-                                    , case interval of
-                                        5 ->
-                                            if List.any volNeedsFrequentPoll (RemoteData.withDefault [] project.volumes) then
-                                                OSVolumes.requestVolumes project
-
-                                            else
-                                                Cmd.none
-
-                                        60 ->
-                                            OSVolumes.requestVolumes project
-
-                                        _ ->
-                                            Cmd.none
-                                    )
+                                    pollVolumes
 
                                 VolumeDetail volumeUuid _ ->
                                     ( model
@@ -510,7 +512,7 @@ processProjectSpecificMsg : Model -> Project -> ProjectSpecificMsgConstructor ->
 processProjectSpecificMsg model project msg =
     case msg of
         SetProjectView projectViewConstructor ->
-            ViewStateHelpers.setProjectView model project projectViewConstructor
+            ViewStateHelpers.setProjectView project projectViewConstructor model
 
         PrepareCredentialedRequest requestProto posixTime ->
             let
@@ -525,8 +527,8 @@ processProjectSpecificMsg model project msg =
                     project.auth.expiresAt |> Time.posixToMillis
 
                 tokenExpired =
-                    -- Token expiring within 10 minutes
-                    tokenExpireTimeMillis < currentTimeMillis + 600000
+                    -- Token expiring within 5 minutes
+                    tokenExpireTimeMillis < currentTimeMillis + 300000
             in
             if not tokenExpired then
                 -- Token still valid, fire the request with current token
@@ -595,10 +597,10 @@ processProjectSpecificMsg model project msg =
                                 Just p ->
                                     ProjectView
                                         p.auth.project.uuid
-                                        { createPopup = False }
+                                        Defaults.projectViewParams
                                     <|
-                                        ListProjectServers
-                                            Defaults.serverListViewParams
+                                        AllResources
+                                            Defaults.allResourcesListViewParams
 
                                 Nothing ->
                                     NonProjectView <| LoginPicker
@@ -633,6 +635,7 @@ processProjectSpecificMsg model project msg =
                             viewParams.keypairName
                             (viewParams.deployGuacamole |> Maybe.withDefault False)
                             viewParams.deployDesktopEnvironment
+                            viewParams.installOperatingSystemUpdates
                     , metadata =
                         Helpers.newServerMetadata
                             currentExoServerVersion
@@ -712,8 +715,8 @@ processProjectSpecificMsg model project msg =
                         project.auth.project.uuid
                         { createPopup = False }
                     <|
-                        ListProjectServers
-                            Defaults.serverListViewParams
+                        AllResources
+                            Defaults.allResourcesListViewParams
 
                 createImageCmd =
                     Rest.Nova.requestCreateServerImage project serverUuid imageName
@@ -866,18 +869,79 @@ processProjectSpecificMsg model project msg =
         ReceiveFlavors flavors ->
             Rest.Nova.receiveFlavors model project flavors
 
+        RequestKeypairs ->
+            let
+                newKeypairs =
+                    case project.keypairs of
+                        RemoteData.Success _ ->
+                            project.keypairs
+
+                        _ ->
+                            RemoteData.Loading
+
+                newProject =
+                    { project | keypairs = newKeypairs }
+
+                newModel =
+                    GetterSetters.modelUpdateProject model newProject
+            in
+            ( newModel
+            , Rest.Nova.requestKeypairs newProject
+            )
+
         ReceiveKeypairs keypairs ->
             Rest.Nova.receiveKeypairs model project keypairs
+
+        RequestCreateKeypair keypairName publicKey ->
+            ( model, Rest.Nova.requestCreateKeypair project keypairName publicKey )
+
+        ReceiveCreateKeypair keypair ->
+            let
+                newProject =
+                    GetterSetters.projectUpdateKeypair project keypair
+
+                newModel =
+                    GetterSetters.modelUpdateProject model newProject
+            in
+            ViewStateHelpers.setProjectView newProject (ListKeypairs Defaults.keypairListViewParams) newModel
+
+        RequestDeleteKeypair keypairName ->
+            ( model, Rest.Nova.requestDeleteKeypair project keypairName )
+
+        ReceiveDeleteKeypair errorContext keypairName result ->
+            case result of
+                Err e ->
+                    State.Error.processStringError model errorContext (Debug.toString e)
+
+                Ok () ->
+                    let
+                        newKeypairs =
+                            case project.keypairs of
+                                RemoteData.Success keypairs ->
+                                    keypairs
+                                        |> List.filter (\k -> k.name /= keypairName)
+                                        |> RemoteData.Success
+
+                                _ ->
+                                    project.keypairs
+
+                        newProject =
+                            { project | keypairs = newKeypairs }
+
+                        newModel =
+                            GetterSetters.modelUpdateProject model newProject
+                    in
+                    ( newModel, Cmd.none )
 
         ReceiveCreateServer _ ->
             let
                 newViewState =
                     ProjectView
                         project.auth.project.uuid
-                        { createPopup = False }
+                        Defaults.projectViewParams
                     <|
-                        ListProjectServers
-                            Defaults.serverListViewParams
+                        AllResources
+                            Defaults.allResourcesListViewParams
             in
             ( model, Cmd.none )
                 |> Helpers.pipelineCmd
@@ -898,8 +962,8 @@ processProjectSpecificMsg model project msg =
                                         ProjectView
                                             projectId
                                             viewParams
-                                            (ListProjectServers
-                                                Defaults.serverListViewParams
+                                            (AllResources
+                                                Defaults.allResourcesListViewParams
                                             )
 
                                     else
@@ -1032,12 +1096,9 @@ processProjectSpecificMsg model project msg =
         ReceiveCreateExoSecurityGroup group ->
             Rest.Neutron.receiveCreateExoSecurityGroupAndRequestCreateRules model project group
 
-        ReceiveCockpitLoginStatus serverUuid result ->
-            Rest.Cockpit.receiveCockpitLoginStatus model project serverUuid result
-
         ReceiveCreateVolume ->
             {- Should we add new volume to model now? -}
-            ViewStateHelpers.setProjectView model project (ListProjectVolumes [])
+            ViewStateHelpers.setProjectView project (ListProjectVolumes Defaults.volumeListViewParams) model
 
         ReceiveVolumes volumes ->
             let
@@ -1125,10 +1186,10 @@ processProjectSpecificMsg model project msg =
             ( model, OSVolumes.requestVolumes project )
 
         ReceiveAttachVolume attachment ->
-            ViewStateHelpers.setProjectView model project (MountVolInstructions attachment)
+            ViewStateHelpers.setProjectView project (MountVolInstructions attachment) model
 
         ReceiveDetachVolume ->
-            ViewStateHelpers.setProjectView model project (ListProjectVolumes [])
+            ViewStateHelpers.setProjectView project (ListProjectVolumes Defaults.volumeListViewParams) model
 
         ReceiveAppCredential appCredential ->
             let
@@ -1524,7 +1585,7 @@ createProject model authToken endpoints =
             , images = []
             , servers = RDPP.RemoteDataPlusPlus RDPP.DontHave (RDPP.Loading model.clientCurrentTime)
             , flavors = []
-            , keypairs = []
+            , keypairs = RemoteData.NotAsked
             , volumes = RemoteData.NotAsked
             , networks = RDPP.empty
             , floatingIps = []
@@ -1533,41 +1594,28 @@ createProject model authToken endpoints =
             , computeQuota = RemoteData.NotAsked
             , volumeQuota = RemoteData.NotAsked
             , pendingCredentialedRequests = []
-            , userAppProxyHostname =
-                endpoints.keystone
-                    |> UrlHelpers.hostnameFromUrl
-                    |> (\h -> Dict.get h model.cloudsWithUserAppProxy)
-            , excludeFilter = model.style.defaultImageExcludeFilter
-            , featuredImageNamePrefix = model.style.featuredImageNamePrefix
             }
 
         newProjects =
             newProject :: model.projects
 
-        newViewState =
+        newViewStateFunc =
             -- If the user is selecting projects from an unscoped provider then don't interrupt them
             case model.viewState of
                 NonProjectView (SelectProjects _ _) ->
-                    model.viewState
+                    \model_ -> ( model_, Cmd.none )
 
                 NonProjectView _ ->
-                    ProjectView
-                        newProject.auth.project.uuid
-                        { createPopup = False }
-                    <|
-                        ListProjectServers Defaults.serverListViewParams
+                    ViewStateHelpers.setProjectView newProject <|
+                        AllResources Defaults.allResourcesListViewParams
 
-                ProjectView _ projectViewParams _ ->
-                    ProjectView
-                        newProject.auth.project.uuid
-                        projectViewParams
-                    <|
-                        ListProjectServers Defaults.serverListViewParams
+                ProjectView _ _ _ ->
+                    ViewStateHelpers.setProjectView newProject <|
+                        AllResources Defaults.allResourcesListViewParams
 
         newModel =
             { model
                 | projects = newProjects
-                , viewState = newViewState
             }
     in
     ( newModel
@@ -1579,6 +1627,7 @@ createProject model authToken endpoints =
         |> List.map (\x -> x newProject)
         |> Cmd.batch
     )
+        |> Helpers.pipelineCmd newViewStateFunc
 
 
 createUnscopedProvider : Model -> OSTypes.UnscopedAuthToken -> HelperTypes.Url -> ( Model, Cmd Msg )

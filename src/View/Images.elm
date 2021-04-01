@@ -4,7 +4,6 @@ import Dict
 import Element
 import Element.Font as Font
 import Element.Input as Input
-import FeatherIcons
 import Filesize
 import Helpers.String
 import List.Extra
@@ -90,20 +89,24 @@ filterBySearchText searchText someImages =
         List.filter (\i -> String.contains (String.toUpper searchText) (String.toUpper i.name)) someImages
 
 
-isImageNotExcludedByDeployer : Maybe ExcludeFilter -> OSTypes.Image -> Bool
-isImageNotExcludedByDeployer maybeExcludeFilter image =
-    case maybeExcludeFilter of
+isImageExcludedByDeployer : ExcludeFilter -> OSTypes.Image -> Bool
+isImageExcludedByDeployer excludeFilter image =
+    let
+        maybeActualValue =
+            Dict.get excludeFilter.filterKey image.additionalProperties
+    in
+    case maybeActualValue of
         Nothing ->
-            True
+            False
 
-        Just excludeFilter ->
-            let
-                excluded =
-                    Dict.get excludeFilter.filterKey image.additionalProperties
-                        |> Maybe.map (\actualValue -> excludeFilter.filterValue /= actualValue)
-                        |> Maybe.withDefault False
-            in
-            not excluded
+        Just actualValue ->
+            excludeFilter.filterValue == actualValue
+
+
+isNotExcludedByDeployer : ExcludeFilter -> OSTypes.Image -> Bool
+isNotExcludedByDeployer excludeFilter image =
+    isImageExcludedByDeployer excludeFilter image
+        |> not
 
 
 isImageFeaturedByDeployer : Maybe String -> OSTypes.Image -> Bool
@@ -116,18 +119,27 @@ isImageFeaturedByDeployer maybeFeaturedImageNamePrefix image =
             String.startsWith featuredImageNamePrefix image.name && image.visibility == OSTypes.ImagePublic
 
 
-filterByExcludedByDeployer : Maybe ExcludeFilter -> List OSTypes.Image -> List OSTypes.Image
-filterByExcludedByDeployer maybeExcludeFilter someImages =
-    List.filter (isImageNotExcludedByDeployer maybeExcludeFilter) someImages
+filterByNotExcludedByDeployer : Maybe ExcludeFilter -> List OSTypes.Image -> List OSTypes.Image
+filterByNotExcludedByDeployer maybeExcludeFilter someImages =
+    case maybeExcludeFilter of
+        Nothing ->
+            someImages
+
+        Just excludeFilter ->
+            List.filter (isNotExcludedByDeployer excludeFilter) someImages
 
 
-filterImages : ImageListViewParams -> Project -> List OSTypes.Image -> List OSTypes.Image
-filterImages imageListViewParams project someImages =
+filterImages : View.Types.Context -> ImageListViewParams -> Project -> List OSTypes.Image -> List OSTypes.Image
+filterImages context imageListViewParams project someImages =
+    let
+        imageExcludeFilter =
+            VH.imageExcludeFilterLookup context project
+    in
     someImages
-        |> filterByExcludedByDeployer project.excludeFilter
         |> filterByOwner imageListViewParams.onlyOwnImages project
         |> filterByTags imageListViewParams.tags
         |> filterBySearchText imageListViewParams.searchText
+        |> filterByNotExcludedByDeployer imageExcludeFilter
 
 
 images : View.Types.Context -> Project -> ImageListViewParams -> SortTableParams -> Element.Element Msg
@@ -144,7 +156,7 @@ images context project imageListViewParams sortTableParams =
                 |> List.reverse
 
         filteredImages =
-            project.images |> filterImages imageListViewParams project
+            project.images |> filterImages context imageListViewParams project
 
         tagsAfterFilteringImages =
             generateAllTags filteredImages
@@ -152,8 +164,11 @@ images context project imageListViewParams sortTableParams =
         noMatchWarning =
             (imageListViewParams.tags /= Set.empty) && (List.length filteredImages == 0)
 
+        featuredImageNamePrefix =
+            VH.featuredImageNamePrefixLookup context project
+
         ( featuredImages, nonFeaturedImages_ ) =
-            List.partition (isImageFeaturedByDeployer project.featuredImageNamePrefix) filteredImages
+            List.partition (isImageFeaturedByDeployer featuredImageNamePrefix) filteredImages
 
         ( ownImages, otherImages ) =
             List.partition (\i -> projectOwnsImage project i) nonFeaturedImages_
@@ -338,55 +353,13 @@ renderImage context project imageListViewParams sortTableParams image =
         imageDetailsExpanded =
             Set.member image.uuid imageListViewParams.expandImageDetails
 
-        expandImageDetailsButton : Element.Element Msg
-        expandImageDetailsButton =
-            let
-                iconFunction checked =
-                    let
-                        featherIcon =
-                            if checked then
-                                FeatherIcons.chevronDown
-
-                            else
-                                FeatherIcons.chevronRight
-                    in
-                    featherIcon |> FeatherIcons.toHtml [] |> Element.html
-
-                checkboxLabel =
-                    ""
-            in
-            Element.el
-                [ Element.alignLeft
-                , Element.centerY
-                , Element.width Element.shrink
-                ]
-                (Input.checkbox [ Element.paddingXY 10 5 ]
-                    { checked = imageDetailsExpanded
-                    , onChange =
-                        \_ ->
-                            ProjectMsg project.auth.project.uuid <|
-                                SetProjectView <|
-                                    ListImages
-                                        { imageListViewParams
-                                            | expandImageDetails =
-                                                Set.Extra.toggle image.uuid imageListViewParams.expandImageDetails
-                                        }
-                                        sortTableParams
-                    , icon = iconFunction
-                    , label = Input.labelRight [] (Element.text checkboxLabel)
-                    }
-                )
-
         size =
-            "("
-                ++ (case image.size of
-                        Just s ->
-                            Filesize.format s
+            case image.size of
+                Just s ->
+                    Filesize.format s
 
-                        Nothing ->
-                            "size unknown"
-                   )
-                ++ ")"
+                Nothing ->
+                    "size unknown"
 
         chooseMsg =
             ProjectMsg project.auth.project.uuid <|
@@ -395,7 +368,9 @@ renderImage context project imageListViewParams sortTableParams image =
                         Defaults.createServerViewParams
                             image.uuid
                             image.name
-                            (project.userAppProxyHostname |> Maybe.map (\_ -> True))
+                            (VH.userAppProxyLookup context project
+                                |> Maybe.map (\_ -> True)
+                            )
 
         tagChip tag =
             Element.el [ Element.paddingXY 5 0 ]
@@ -420,8 +395,11 @@ renderImage context project imageListViewParams sortTableParams image =
                             Nothing
                 }
 
+        featuredImageNamePrefix =
+            VH.featuredImageNamePrefixLookup context project
+
         featuredBadge =
-            if isImageFeaturedByDeployer project.featuredImageNamePrefix image then
+            if isImageFeaturedByDeployer featuredImageNamePrefix image then
                 ExoCard.badge "featured"
 
             else
@@ -438,33 +416,34 @@ renderImage context project imageListViewParams sortTableParams image =
             else
                 Element.none
 
-        imageBriefView =
+        title =
             Element.row
                 [ Element.width Element.fill
-                , Element.spacingXY 0 0
                 ]
-                [ Element.wrappedRow
-                    [ Element.width Element.fill
+                [ Element.el
+                    [ Font.bold
+                    , Element.padding 5
                     ]
-                    [ expandImageDetailsButton
-                    , Element.el
-                        [ Font.bold
-                        , Element.padding 5
-                        ]
-                        (Element.text image.name)
-                    , Element.el
-                        [ Font.color <| SH.toElementColor <| context.palette.muted
-                        , Element.padding 5
-                        ]
-                        (Element.text size)
-                    , featuredBadge
-                    , ownerBadge
+                    (Element.text image.name)
+                , featuredBadge
+                , ownerBadge
+                ]
+
+        subtitle =
+            Element.row
+                []
+                [ Element.el
+                    [ Font.color <| SH.toElementColor <| context.palette.muted
+                    , Element.padding 5
                     ]
-                , chooseButton
+                    (Element.text size)
                 ]
 
         imageDetailsView =
-            Element.column []
+            Element.column
+                (VH.exoColumnAttributes
+                    ++ [ Element.width Element.fill ]
+                )
                 [ Element.wrappedRow
                     [ Element.width Element.fill
                     ]
@@ -477,28 +456,24 @@ renderImage context project imageListViewParams sortTableParams image =
                             tagChip
                             image.tags
                     )
+                , Element.el
+                    [ Element.alignRight ]
+                    chooseButton
                 ]
     in
-    Widget.column
-        ((SH.materialStyle context.palette).cardColumn
-            |> (\x ->
-                    { x
-                        | containerColumn =
-                            (SH.materialStyle context.palette).cardColumn.containerColumn
-                                ++ [ Element.padding 0
-                                   ]
-                        , element =
-                            (SH.materialStyle context.palette).cardColumn.element
-                                ++ [ Element.padding 3
-                                   ]
-                    }
-               )
+    ExoCard.expandoCard
+        context.palette
+        imageDetailsExpanded
+        (\_ ->
+            ProjectMsg project.auth.project.uuid <|
+                SetProjectView <|
+                    ListImages
+                        { imageListViewParams
+                            | expandImageDetails =
+                                Set.Extra.toggle image.uuid imageListViewParams.expandImageDetails
+                        }
+                        sortTableParams
         )
-        (if imageDetailsExpanded then
-            [ imageBriefView
-            , imageDetailsView
-            ]
-
-         else
-            [ imageBriefView ]
-        )
+        title
+        subtitle
+        imageDetailsView

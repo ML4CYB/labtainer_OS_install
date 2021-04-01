@@ -42,8 +42,8 @@ import UUID
 import Url
 
 
-init : Flags -> Maybe ( Url.Url, Browser.Navigation.Key ) -> ( Model, Cmd Msg )
-init flags maybeUrlKey =
+init : Flags -> ( Url.Url, Browser.Navigation.Key ) -> ( Model, Cmd Msg )
+init flags urlKey =
     let
         currentTime =
             Time.millisToPosix flags.epoch
@@ -89,7 +89,7 @@ init flags maybeUrlKey =
         emptyModel showDebugMsgs uuid =
             { logMessages = []
             , urlPathPrefix = flags.urlPathPrefix
-            , maybeNavigationKey = maybeUrlKey |> Maybe.map Tuple.second
+            , navigationKey = Tuple.second urlKey
             , prevUrl = ""
             , viewState =
                 -- This is will get replaced with the appropriate login view
@@ -99,7 +99,6 @@ init flags maybeUrlKey =
             , projects = []
             , toasties = Toasty.initialState
             , cloudCorsProxyUrl = flags.cloudCorsProxyUrl
-            , cloudsWithUserAppProxy = Dict.fromList flags.cloudsWithUserAppProxy
             , clientUuid = uuid
             , clientCurrentTime = currentTime
             , timeZone = timeZone
@@ -123,11 +122,21 @@ init flags maybeUrlKey =
                 , userSupportEmail =
                     flags.userSupportEmail
                         |> Maybe.withDefault "incoming+exosphere-exosphere-6891229-issue-@incoming.gitlab.com"
-                , featuredImageNamePrefix = flags.featuredImageNamePrefix
-                , defaultImageExcludeFilter = flags.defaultImageExcludeFilter
                 , localization = Maybe.withDefault Defaults.localization flags.localization
                 }
             , openIdConnectLoginConfig = flags.openIdConnectLoginConfig
+            , cloudSpecificConfigs =
+                flags.clouds
+                    |> List.map
+                        (\c ->
+                            ( c.keystoneHostname
+                            , { userAppProxy = c.userAppProxy
+                              , imageExcludeFilter = c.imageExcludeFilter
+                              , featuredImageNamePrefix = c.featuredImageNamePrefix
+                              }
+                            )
+                        )
+                    |> Dict.fromList
             }
 
         -- This only gets used if we do not find a client UUID in stored state
@@ -170,13 +179,8 @@ init flags maybeUrlKey =
                 defaultViewState =
                     State.ViewState.defaultViewState hydratedModel
             in
-            case maybeUrlKey of
-                Just ( url, _ ) ->
-                    AppUrl.Parser.urlToViewState flags.urlPathPrefix defaultViewState url
-                        |> Maybe.withDefault (NonProjectView PageNotFound)
-
-                Nothing ->
-                    defaultViewState
+            AppUrl.Parser.urlToViewState flags.urlPathPrefix defaultViewState (Tuple.first urlKey)
+                |> Maybe.withDefault (NonProjectView PageNotFound)
 
         -- If any projects are password-authenticated, get Application Credentials for them so we can forget the passwords
         projectsNeedingAppCredentials : List Project
@@ -219,13 +223,13 @@ init flags maybeUrlKey =
         ( setViewModel, setViewCmd ) =
             case viewState of
                 NonProjectView nonProjectViewConstructor ->
-                    setNonProjectView newModel nonProjectViewConstructor
+                    setNonProjectView nonProjectViewConstructor newModel
 
                 ProjectView projectId _ projectViewConstructor ->
                     -- If initial view is a project-specific view then we call setProjectView to fire any needed API calls
                     case GetterSetters.projectLookup newModel projectId of
                         Just project ->
-                            setProjectView newModel project projectViewConstructor
+                            setProjectView project projectViewConstructor newModel
 
                         Nothing ->
                             ( newModel, Cmd.none )

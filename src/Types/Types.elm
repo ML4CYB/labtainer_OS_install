@@ -1,6 +1,6 @@
 module Types.Types exposing
-    ( CloudsWithUserAppProxy
-    , CockpitLoginStatus(..)
+    ( AllResourcesListViewParams
+    , CloudSpecificConfig
     , CreateServerViewParams
     , DeleteConfirmation
     , DeleteVolumeConfirmation
@@ -16,6 +16,8 @@ module Types.Types exposing
     , ImageListViewParams
     , JetstreamCreds
     , JetstreamProvider(..)
+    , KeypairIdentifier
+    , KeypairListViewParams
     , KeystoneHostname
     , Localization
     , LogMessage
@@ -53,6 +55,7 @@ module Types.Types exposing
     , UserAppProxyHostname
     , VerboseStatus
     , ViewState(..)
+    , VolumeListViewParams
     , WindowSize
     , currentExoServerVersion
     )
@@ -110,9 +113,14 @@ type alias Flags =
     , userSupportEmail : Maybe String
     , openIdConnectLoginConfig :
         Maybe OpenIdConnectLoginConfig
-    , featuredImageNamePrefix : Maybe String
-    , defaultImageExcludeFilter : Maybe ExcludeFilter
     , localization : Maybe Localization
+    , clouds :
+        List
+            { keystoneHostname : KeystoneHostname
+            , userAppProxy : Maybe UserAppProxyHostname
+            , imageExcludeFilter : Maybe ExcludeFilter
+            , featuredImageNamePrefix : Maybe String
+            }
 
     -- Flags that Exosphere sets dynamically
     , width : Int
@@ -124,7 +132,13 @@ type alias Flags =
     , randomSeed3 : Int
     , epoch : Int
     , timeZone : Int
-    , cloudsWithUserAppProxy : List ( String, String )
+    }
+
+
+type alias CloudSpecificConfig =
+    { userAppProxy : Maybe UserAppProxyHostname
+    , imageExcludeFilter : Maybe ExcludeFilter
+    , featuredImageNamePrefix : Maybe String
     }
 
 
@@ -137,7 +151,7 @@ type alias WindowSize =
 type alias Model =
     { logMessages : List LogMessage
     , urlPathPrefix : Maybe String
-    , maybeNavigationKey : Maybe Browser.Navigation.Key
+    , navigationKey : Browser.Navigation.Key
 
     -- Used to determine whether to pushUrl (change of view) or replaceUrl (just change of view parameters)
     , prevUrl : String
@@ -147,7 +161,6 @@ type alias Model =
     , projects : List Project
     , toasties : Toasty.Stack Toast
     , cloudCorsProxyUrl : Maybe CloudCorsProxyUrl
-    , cloudsWithUserAppProxy : CloudsWithUserAppProxy
     , clientUuid : UUID.UUID
     , clientCurrentTime : Time.Posix
     , timeZone : Time.Zone
@@ -155,6 +168,7 @@ type alias Model =
     , style : Style
     , openIdConnectLoginConfig :
         Maybe OpenIdConnectLoginConfig
+    , cloudSpecificConfigs : Dict.Dict KeystoneHostname CloudSpecificConfig
     }
 
 
@@ -192,8 +206,6 @@ type alias Style =
     , aboutAppMarkdown : Maybe String
     , supportInfoMarkdown : Maybe String
     , userSupportEmail : String
-    , featuredImageNamePrefix : Maybe String
-    , defaultImageExcludeFilter : Maybe ExcludeFilter
     , localization : Localization
     }
 
@@ -209,10 +221,6 @@ type alias OpenIdConnectLoginConfig =
 
 type alias CloudCorsProxyUrl =
     HelperTypes.Url
-
-
-type alias CloudsWithUserAppProxy =
-    Dict.Dict KeystoneHostname UserAppProxyHostname
 
 
 type alias KeystoneHostname =
@@ -252,7 +260,7 @@ type alias Project =
     , images : List OSTypes.Image
     , servers : RDPP.RemoteDataPlusPlus HttpErrorWithBody (List Server)
     , flavors : List OSTypes.Flavor
-    , keypairs : List OSTypes.Keypair
+    , keypairs : WebData (List OSTypes.Keypair)
     , volumes : WebData (List OSTypes.Volume)
     , networks : RDPP.RemoteDataPlusPlus HttpErrorWithBody (List OSTypes.Network)
     , floatingIps : List OSTypes.IpAddress
@@ -261,9 +269,6 @@ type alias Project =
     , computeQuota : WebData OSTypes.ComputeQuota
     , volumeQuota : WebData OSTypes.VolumeQuota
     , pendingCredentialedRequests : List (OSTypes.AuthTokenString -> Cmd Msg) -- Requests waiting for a valid auth token
-    , userAppProxyHostname : Maybe UserAppProxyHostname
-    , excludeFilter : Maybe ExcludeFilter
-    , featuredImageNamePrefix : Maybe String
     }
 
 
@@ -301,7 +306,6 @@ type Msg
     | RequestProjectLoginFromProvider OSTypes.KeystoneUrl (List UnscopedProviderProject)
     | ProjectMsg ProjectIdentifier ProjectSpecificMsgConstructor
     | InputOpenRc OSTypes.OpenstackLogin String
-    | OpenInBrowser String
     | OpenNewWindow String
     | NavigateToUrl String
     | ToastyMsg (Toasty.Msg Toast)
@@ -332,6 +336,9 @@ type ProjectSpecificMsgConstructor
     | RequestDeleteVolume OSTypes.VolumeUuid
     | RequestAttachVolume OSTypes.ServerUuid OSTypes.VolumeUuid
     | RequestDetachVolume OSTypes.VolumeUuid
+    | RequestKeypairs
+    | RequestCreateKeypair OSTypes.KeypairName OSTypes.PublicKey
+    | RequestDeleteKeypair OSTypes.KeypairName
     | RequestCreateServerImage OSTypes.ServerUuid String
     | ReceiveImages (List OSTypes.Image)
     | ReceiveServer OSTypes.ServerUuid ErrorContext (Result HttpErrorWithBody OSTypes.Server)
@@ -342,6 +349,8 @@ type ProjectSpecificMsgConstructor
     | ReceiveDeleteServer OSTypes.ServerUuid (Maybe OSTypes.IpAddressValue)
     | ReceiveFlavors (List OSTypes.Flavor)
     | ReceiveKeypairs (List OSTypes.Keypair)
+    | ReceiveCreateKeypair OSTypes.Keypair
+    | ReceiveDeleteKeypair ErrorContext OSTypes.KeypairName (Result Http.Error ())
     | ReceiveNetworks ErrorContext (Result HttpErrorWithBody (List OSTypes.Network))
     | ReceiveFloatingIps (List OSTypes.IpAddress)
     | ReceivePorts ErrorContext (Result HttpErrorWithBody (List OSTypes.Port))
@@ -349,7 +358,6 @@ type ProjectSpecificMsgConstructor
     | ReceiveDeleteFloatingIp OSTypes.IpAddressUuid
     | ReceiveSecurityGroups (List OSTypes.SecurityGroup)
     | ReceiveCreateExoSecurityGroup OSTypes.SecurityGroup
-    | ReceiveCockpitLoginStatus OSTypes.ServerUuid (Result Http.Error String)
     | ReceiveCreateVolume
     | ReceiveVolumes (List OSTypes.Volume)
     | ReceiveDeleteVolume
@@ -416,10 +424,12 @@ type alias ProjectViewParams =
 
 
 type ProjectViewConstructor
-    = ListImages ImageListViewParams SortTableParams
+    = AllResources AllResourcesListViewParams
+    | ListImages ImageListViewParams SortTableParams
     | ListProjectServers ServerListViewParams
-    | ListProjectVolumes (List DeleteVolumeConfirmation)
-    | ListQuotaUsage
+    | ListProjectVolumes VolumeListViewParams
+    | ListKeypairs KeypairListViewParams
+    | CreateKeypair String String
     | ServerDetail OSTypes.ServerUuid ServerDetailViewParams
     | CreateServerImage OSTypes.ServerUuid String
     | VolumeDetail OSTypes.VolumeUuid (List DeleteVolumeConfirmation)
@@ -427,6 +437,13 @@ type ProjectViewConstructor
     | CreateVolume OSTypes.VolumeName NumericTextInput
     | AttachVolumeModal (Maybe OSTypes.ServerUuid) (Maybe OSTypes.VolumeUuid)
     | MountVolInstructions OSTypes.VolumeAttachment
+
+
+type alias AllResourcesListViewParams =
+    { serverListViewParams : ServerListViewParams
+    , volumeListViewParams : VolumeListViewParams
+    , keypairListViewParams : KeypairListViewParams
+    }
 
 
 type alias ServerListViewParams =
@@ -451,6 +468,12 @@ type ServerDetailActiveTooltip
     | InteractionStatusTooltip Interaction
 
 
+type alias VolumeListViewParams =
+    { expandedVols : List OSTypes.VolumeUuid
+    , deleteConfirmations : List DeleteVolumeConfirmation
+    }
+
+
 type alias CreateServerViewParams =
     { serverName : String
     , imageUuid : OSTypes.ImageUuid
@@ -464,6 +487,7 @@ type alias CreateServerViewParams =
     , keypairName : Maybe String
     , deployGuacamole : Maybe Bool -- Nothing when cloud doesn't support Guacamole
     , deployDesktopEnvironment : Bool
+    , installOperatingSystemUpdates : Bool
     }
 
 
@@ -477,6 +501,16 @@ type alias DeleteConfirmation =
 
 type alias DeleteVolumeConfirmation =
     OSTypes.VolumeUuid
+
+
+type alias KeypairListViewParams =
+    { expandedKeypairs : List KeypairIdentifier
+    , deleteConfirmations : List KeypairIdentifier
+    }
+
+
+type alias KeypairIdentifier =
+    ( OSTypes.KeypairName, OSTypes.KeypairFingerprint )
 
 
 type IPInfoLevel
@@ -536,7 +570,6 @@ type ServerOrigin
 type alias ServerFromExoProps =
     { exoServerVersion : ExoServerVersion
     , exoSetupStatus : RDPP.RemoteDataPlusPlus HttpErrorWithBody ExoSetupStatus
-    , cockpitStatus : CockpitLoginStatus
     , resourceUsage : ResourceUsageRDPP
     , guacamoleStatus : GuacTypes.ServerGuacamoleStatus
     , exoCreatorUsername : Maybe String
@@ -563,13 +596,6 @@ type FloatingIpState
     | RequestedWaiting
     | Success
     | Failed
-
-
-type CockpitLoginStatus
-    = NotChecked
-    | CheckedNotReady
-    | Ready
-    | ReadyButRecheck
 
 
 type ServerUiStatus

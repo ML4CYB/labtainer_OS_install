@@ -25,8 +25,7 @@ import Time
 import Types.Interaction as ITypes
 import Types.Types
     exposing
-        ( CockpitLoginStatus(..)
-        , IPInfoLevel(..)
+        ( IPInfoLevel(..)
         , Msg(..)
         , NonProjectViewConstructor(..)
         , PasswordVisibility(..)
@@ -294,7 +293,7 @@ serverDetail_ context project currentTimeAndZone serverDetailViewParams server =
             , passwordVulnWarning context server
             , VH.compactKVRow "Name" serverNameView
             , VH.compactKVRow "Status" (serverStatus context project.auth.project.uuid serverDetailViewParams server)
-            , VH.compactKVRow "UUID" <| copyableText context.palette server.osProps.uuid
+            , VH.compactKVRow "UUID" <| copyableText context.palette [] server.osProps.uuid
             , VH.compactKVRow "Created on" (Element.text details.created)
             , creatorNameView
             , VH.compactKVRow
@@ -375,7 +374,7 @@ serverDetail_ context project currentTimeAndZone serverDetailViewParams server =
                 server
                 project.auth.project.uuid
                 (Tuple.first currentTimeAndZone)
-                project.userAppProxyHostname
+                (VH.userAppProxyLookup context project)
                 serverDetailViewParams
             , Element.el VH.heading3 (Element.text "Password")
             , serverPassword context project.auth.project.uuid serverDetailViewParams server
@@ -498,14 +497,6 @@ serverStatus context projectId serverDetailViewParams server =
                 [ Element.text "Detailed status"
                 , VH.compactKVSubRow "OpenStack status" (Element.text friendlyOpenstackStatus)
                 , VH.compactKVSubRow "Power state" (Element.text friendlyPowerState)
-                , VH.compactKVSubRow
-                    (String.join " "
-                        [ context.localization.virtualComputer
-                            |> Helpers.String.toTitleCase
-                        , "Dashboard and Terminal readiness"
-                        ]
-                    )
-                    (Element.paragraph [] [ Element.text (friendlyCockpitReadiness server.exoProps.serverOrigin) ])
                 ]
 
             else
@@ -714,7 +705,7 @@ interactions context server projectId currentTime tlsReverseProxyHostname server
                                             Element.row
                                                 []
                                                 [ Element.text ": "
-                                                , copyableText context.palette text
+                                                , copyableText context.palette [] text
                                                 ]
 
                                         _ ->
@@ -728,8 +719,6 @@ interactions context server projectId currentTime tlsReverseProxyHostname server
                         ]
     in
     [ ITypes.GuacTerminal
-    , ITypes.CockpitDashboard
-    , ITypes.CockpitTerminal
     , ITypes.NativeSSH
     , ITypes.Console
     ]
@@ -745,7 +734,7 @@ serverPassword context projectId serverDetailViewParams server =
                 [ Element.spacing 10 ]
                 [ case serverDetailViewParams.passwordVisibility of
                     PasswordShown ->
-                        copyableText context.palette password
+                        copyableText context.palette [] password
 
                     PasswordHidden ->
                         Element.none
@@ -1032,7 +1021,7 @@ renderIpAddresses context projectId serverUuid serverDetailViewParams ipAddresse
                     (\ipAddress ->
                         VH.compactKVSubRow
                             (Helpers.String.toTitleCase context.localization.floatingIpAddress)
-                            (copyableText context.palette ipAddress.address)
+                            (copyableText context.palette [] ipAddress.address)
                     )
 
         ipButton : Element.Element Msg -> String -> IPInfoLevel -> Element.Element Msg
@@ -1085,27 +1074,6 @@ renderIpAddresses context projectId serverUuid serverDetailViewParams ipAddresse
             Element.column
                 (VH.exoColumnAttributes ++ [ Element.padding 0 ])
                 (floatingIpAddressRows ++ [ ipButton icon "IP Details" IPDetails ])
-
-
-friendlyCockpitReadiness : ServerOrigin -> String
-friendlyCockpitReadiness serverOrigin =
-    case serverOrigin of
-        ServerNotFromExo ->
-            "N/A"
-
-        ServerFromExo serverFromExoProps ->
-            case serverFromExoProps.cockpitStatus of
-                NotChecked ->
-                    "Not checked yet"
-
-                CheckedNotReady ->
-                    "Checked, not ready yet"
-
-                Ready ->
-                    "Ready"
-
-                ReadyButRecheck ->
-                    "Ready"
 
 
 serverVolumes : View.Types.Context -> Project -> Server -> Element.Element Msg

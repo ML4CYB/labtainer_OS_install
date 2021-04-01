@@ -1,6 +1,5 @@
 module Helpers.Helpers exposing
     ( alwaysRegex
-    , appIsElectron
     , checkFloatingIpState
     , getBootVol
     , isBootVol
@@ -30,13 +29,13 @@ import Json.Decode as Decode
 import Json.Encode
 import OpenStack.Types as OSTypes
 import Regex
+import RemoteData
 import ServerDeploy
 import Time
 import Types.Guacamole as GuacTypes
 import Types.Types
     exposing
-        ( CockpitLoginStatus(..)
-        , Endpoints
+        ( Endpoints
         , ExoServerVersion
         , ExoSetupStatus(..)
         , FloatingIpState(..)
@@ -171,13 +170,14 @@ checkFloatingIpState serverDetails floatingIpState =
                 NotRequestable
 
 
-renderUserDataTemplate : Project -> String -> Maybe String -> Bool -> Bool -> String
-renderUserDataTemplate project userDataTemplate maybeKeypairName deployGuacamole deployDesktopEnvironment =
+renderUserDataTemplate : Project -> String -> Maybe String -> Bool -> Bool -> Bool -> String
+renderUserDataTemplate project userDataTemplate maybeKeypairName deployGuacamole deployDesktopEnvironment installOperatingSystemUpdates =
     -- Configure cloud-init user data based on user's choice for SSH keypair and Guacamole
     let
         getPublicKeyFromKeypairName : String -> Maybe String
         getPublicKeyFromKeypairName keypairName =
             project.keypairs
+                |> RemoteData.withDefault []
                 |> List.filter (\kp -> kp.name == keypairName)
                 |> List.head
                 |> Maybe.map .publicKey
@@ -206,10 +206,19 @@ renderUserDataTemplate project userDataTemplate maybeKeypairName deployGuacamole
 
             else
                 "echo \"Not deploying a desktop environment\""
+
+        installOperatingSystemUpatesYaml : String
+        installOperatingSystemUpatesYaml =
+            if installOperatingSystemUpdates then
+                "true"
+
+            else
+                "false"
     in
     [ ( "{ssh-authorized-keys}\n", authorizedKeysYaml )
     , ( "{guacamole-setup}\n", guacamoleSetupCmdsYaml )
     , ( "{desktop-environment-setup}\n", desktopEnvironmentSetupCmdsYaml )
+    , ( "{install-os-updates}", installOperatingSystemUpatesYaml )
     ]
         |> List.foldl (\t -> String.replace (Tuple.first t) (Tuple.second t)) userDataTemplate
 
@@ -443,7 +452,7 @@ serverOrigin serverDetails =
     case exoServerVersion of
         Just v ->
             ServerFromExo <|
-                ServerFromExoProps v exoSetupStatusRDPP NotChecked RDPP.empty guacamoleStatus creatorName
+                ServerFromExoProps v exoSetupStatusRDPP RDPP.empty guacamoleStatus creatorName
 
         Nothing ->
             ServerNotFromExo
@@ -509,16 +518,6 @@ serverLessThanThisOld server currentTime maxServerAgeMillis =
 
         Ok createdTime ->
             (curTimeMillis - Time.posixToMillis createdTime) < maxServerAgeMillis
-
-
-appIsElectron : Model -> Bool
-appIsElectron model =
-    case model.maybeNavigationKey of
-        Nothing ->
-            True
-
-        Just _ ->
-            False
 
 
 {-| This one helps string functions together in Rest.ApiModelHelpers and other places

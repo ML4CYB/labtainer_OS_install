@@ -1,5 +1,6 @@
 module Helpers.GetterSetters exposing
-    ( flavorLookup
+    ( cloudConfigLookup
+    , flavorLookup
     , getExternalNetwork
     , getPublicEndpointFromService
     , getServerExouserPassword
@@ -16,6 +17,7 @@ module Helpers.GetterSetters exposing
     , projectSetNetworksLoading
     , projectSetServerLoading
     , projectSetServersLoading
+    , projectUpdateKeypair
     , projectUpdateServer
     , providerLookup
     , serverLookup
@@ -24,13 +26,21 @@ module Helpers.GetterSetters exposing
     , volumeLookup
     )
 
+import Dict
 import Helpers.RemoteDataPlusPlus as RDPP
 import Helpers.Url as UrlHelpers
 import OpenStack.Types as OSTypes
 import RemoteData
 import Time
 import Types.HelperTypes as HelperTypes
-import Types.Types exposing (Model, Project, ProjectIdentifier, Server, UnscopedProvider)
+import Types.Types
+    exposing
+        ( Model
+        , Project
+        , ProjectIdentifier
+        , Server
+        , UnscopedProvider
+        )
 
 
 
@@ -301,3 +311,32 @@ modelUpdateUnscopedProvider model newProvider =
             List.sortBy (\p -> p.authUrl) newProviders
     in
     { model | unscopedProviders = newProvidersSorted }
+
+
+cloudConfigLookup : Model -> Project -> Maybe Types.Types.CloudSpecificConfig
+cloudConfigLookup model project =
+    let
+        projectKeystoneHostname =
+            UrlHelpers.hostnameFromUrl project.endpoints.keystone
+    in
+    Dict.get projectKeystoneHostname model.cloudSpecificConfigs
+
+
+projectUpdateKeypair : Project -> OSTypes.Keypair -> Project
+projectUpdateKeypair project keypair =
+    let
+        otherKeypairs =
+            project.keypairs
+                |> RemoteData.withDefault []
+                |> List.filter
+                    (\k ->
+                        k.fingerprint
+                            /= keypair.fingerprint
+                            && k.name
+                            /= keypair.name
+                    )
+
+        keypairs =
+            keypair :: otherKeypairs
+    in
+    { project | keypairs = RemoteData.Success keypairs }

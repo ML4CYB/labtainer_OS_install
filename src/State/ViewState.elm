@@ -10,7 +10,6 @@ import Browser.Navigation
 import Helpers.GetterSetters as GetterSetters
 import Helpers.Helpers as Helpers
 import Helpers.Random as RandomHelpers
-import Helpers.RemoteDataPlusPlus as RDPP
 import OpenStack.Quotas as OSQuotas
 import OpenStack.Types as OSTypes
 import OpenStack.Volumes as OSVolumes
@@ -28,8 +27,7 @@ import Types.Defaults as Defaults
 import Types.Error as Error
 import Types.Types
     exposing
-        ( CockpitLoginStatus(..)
-        , Model
+        ( Model
         , Msg(..)
         , NonProjectViewConstructor(..)
         , Project
@@ -43,8 +41,8 @@ import View.Helpers
 import View.PageTitle
 
 
-setNonProjectView : Model -> NonProjectViewConstructor -> ( Model, Cmd Msg )
-setNonProjectView model nonProjectViewConstructor =
+setNonProjectView : NonProjectViewConstructor -> Model -> ( Model, Cmd Msg )
+setNonProjectView nonProjectViewConstructor model =
     let
         prevNonProjectViewConstructor =
             case model.viewState of
@@ -132,8 +130,8 @@ setNonProjectView model nonProjectViewConstructor =
         |> Helpers.pipelineCmd (modelUpdateViewState newViewState)
 
 
-setProjectView : Model -> Project -> ProjectViewConstructor -> ( Model, Cmd Msg )
-setProjectView model project projectViewConstructor =
+setProjectView : Project -> ProjectViewConstructor -> Model -> ( Model, Cmd Msg )
+setProjectView project projectViewConstructor model =
     let
         prevProjectViewConstructor =
             case model.viewState of
@@ -148,48 +146,35 @@ setProjectView model project projectViewConstructor =
                     Nothing
 
         newViewState =
-            ProjectView project.auth.project.uuid { createPopup = False } projectViewConstructor
-
-        projectResetCockpitStatuses project_ =
-            -- We need to re-poll Cockpit to determine its availability and get a session cookie
-            -- See merge request 289
-            let
-                serverResetCockpitStatus s =
-                    case s.exoProps.serverOrigin of
-                        ServerNotFromExo ->
-                            s
-
-                        ServerFromExo serverFromExoProps ->
-                            let
-                                newCockpitStatus =
-                                    case serverFromExoProps.cockpitStatus of
-                                        Ready ->
-                                            ReadyButRecheck
-
-                                        _ ->
-                                            serverFromExoProps.cockpitStatus
-
-                                newOriginProps =
-                                    ServerFromExo { serverFromExoProps | cockpitStatus = newCockpitStatus }
-
-                                newExoProps =
-                                    let
-                                        oldExoProps =
-                                            s.exoProps
-                                    in
-                                    { oldExoProps | serverOrigin = newOriginProps }
-                            in
-                            { s | exoProps = newExoProps }
-            in
-            RDPP.withDefault [] project_.servers
-                |> List.map serverResetCockpitStatus
-                |> List.foldl (\s p -> GetterSetters.projectUpdateServer p s) project_
+            ProjectView project.auth.project.uuid Defaults.projectViewParams projectViewConstructor
 
         viewSpecificModelAndCmd =
             case projectViewConstructor of
+                AllResources _ ->
+                    -- Don't fire cmds if we're already in this view
+                    case prevProjectViewConstructor of
+                        Just (AllResources _) ->
+                            ( model, Cmd.none )
+
+                        _ ->
+                            let
+                                ( newModel, newCmd ) =
+                                    ApiModelHelpers.requestServers project.auth.project.uuid model
+                            in
+                            ( newModel
+                            , Cmd.batch
+                                [ newCmd
+                                , Rest.Neutron.requestFloatingIps project
+                                , OSVolumes.requestVolumes project
+                                , Rest.Nova.requestKeypairs project
+                                , OSQuotas.requestComputeQuota project
+                                , OSQuotas.requestVolumeQuota project
+                                , Ports.instantiateClipboardJs ()
+                                ]
+                            )
+
                 ListImages _ _ ->
                     let
-                        -- TODO: Insert image exclude filter into view parameters here?
                         cmd =
                             -- Don't fire cmds if we're already in this view
                             case prevProjectViewConstructor of
@@ -209,17 +194,13 @@ setProjectView model project projectViewConstructor =
 
                         _ ->
                             let
-                                newProject =
-                                    project
-                                        |> projectResetCockpitStatuses
-
                                 ( newModel, newCmd ) =
                                     ApiModelHelpers.requestServers project.auth.project.uuid model
                             in
                             ( newModel
                             , Cmd.batch
                                 [ newCmd
-                                , Rest.Neutron.requestFloatingIps newProject
+                                , Rest.Neutron.requestFloatingIps project
                                 ]
                             )
 
@@ -233,7 +214,6 @@ setProjectView model project projectViewConstructor =
                             let
                                 newModel =
                                     project
-                                        |> projectResetCockpitStatuses
                                         |> GetterSetters.modelUpdateProject model
 
                                 cmd =
@@ -342,21 +322,24 @@ setProjectView model project projectViewConstructor =
                     in
                     ( model, cmd )
 
-                ListQuotaUsage ->
+                ListKeypairs _ ->
                     let
                         cmd =
                             -- Don't fire cmds if we're already in this view
                             case prevProjectViewConstructor of
-                                Just ListQuotaUsage ->
+                                Just (ListKeypairs _) ->
                                     Cmd.none
 
                                 _ ->
                                     Cmd.batch
-                                        [ OSQuotas.requestComputeQuota project
-                                        , OSQuotas.requestVolumeQuota project
+                                        [ Rest.Nova.requestKeypairs project
+                                        , Ports.instantiateClipboardJs ()
                                         ]
                     in
                     ( model, cmd )
+
+                CreateKeypair _ _ ->
+                    ( model, Cmd.none )
 
                 VolumeDetail _ _ ->
                     ( model, Cmd.none )
@@ -431,17 +414,10 @@ modelUpdateViewState viewState model =
                 ( Browser.Navigation.pushUrl, Ports.pushUrlAndTitleToMatomo { newUrl = newUrl, pageTitle = newPageTitle } )
 
         urlCmd =
-            -- This case statement prevents us from trying to update the URL/Matomo in the electron app (where we don't have
-            -- a navigation key)
-            case model.maybeNavigationKey of
-                Just key ->
-                    Cmd.batch
-                        [ updateUrlFunc key newUrl
-                        , updateMatomoCmd
-                        ]
-
-                Nothing ->
-                    Cmd.none
+            Cmd.batch
+                [ updateUrlFunc model.navigationKey newUrl
+                , updateMatomoCmd
+                ]
     in
     ( newModel, urlCmd )
 
@@ -461,7 +437,7 @@ defaultViewState model =
         firstProject :: _ ->
             ProjectView
                 firstProject.auth.project.uuid
-                { createPopup = False }
-                (ListProjectServers
-                    Defaults.serverListViewParams
+                Defaults.projectViewParams
+                (AllResources
+                    Defaults.allResourcesListViewParams
                 )

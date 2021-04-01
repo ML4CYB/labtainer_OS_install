@@ -5,6 +5,7 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
+import FeatherIcons
 import Helpers.GetterSetters as GetterSetters
 import Helpers.Helpers as Helpers
 import Helpers.RemoteDataPlusPlus as RDPP
@@ -134,7 +135,8 @@ createServer context project viewParams =
                             [ Element.none ]
 
                         else
-                            [ guacamolePicker context project viewParams
+                            [ skipOperatingSystemUpdatesPicker context project viewParams
+                            , guacamolePicker context project viewParams
                             , networkPicker context project viewParams
                             , keypairPicker context project viewParams
                             , userDataInput context project viewParams
@@ -624,6 +626,44 @@ guacamolePicker context project createServerViewParams =
                 ]
 
 
+skipOperatingSystemUpdatesPicker : View.Types.Context -> Project -> CreateServerViewParams -> Element.Element Msg
+skipOperatingSystemUpdatesPicker context project createServerViewParams =
+    Element.column VH.exoColumnAttributes
+        [ Input.radioRow [ Element.spacing 10 ]
+            { label = Input.labelAbove [ Element.paddingXY 0 12, Font.bold ] (Element.text "Install operating system updates?")
+            , onChange = \new -> updateCreateServerRequest project { createServerViewParams | installOperatingSystemUpdates = new }
+            , options =
+                [ Input.option True (Element.text "Yes")
+                , Input.option False (Element.text "No")
+
+                {- -}
+                ]
+            , selected = Just createServerViewParams.installOperatingSystemUpdates
+            }
+        , if not createServerViewParams.installOperatingSystemUpdates then
+            Element.paragraph
+                ([ Background.color (SH.toElementColor context.palette.warn), Font.color (SH.toElementColor context.palette.on.warn) ]
+                    ++ VH.exoElementAttributes
+                )
+                [ Element.text <|
+                    String.join ""
+                        [ "Warning: Skipping operating system updates is a security risk, especially when launching "
+                        , Helpers.String.indefiniteArticle context.localization.virtualComputer
+                        , " "
+                        , context.localization.virtualComputer
+                        , " from an older "
+                        , context.localization.staticRepresentationOfBlockDeviceContents
+                        , ". Do not use this "
+                        , context.localization.virtualComputer
+                        , " for any sensitive information or workloads."
+                        ]
+                ]
+
+          else
+            Element.none
+        ]
+
+
 networkPicker : View.Types.Context -> Project -> CreateServerViewParams -> Element.Element Msg
 networkPicker context project viewParams =
     let
@@ -701,8 +741,8 @@ keypairPicker context project viewParams =
         keypairAsOption keypair =
             Input.option keypair.name (Element.text keypair.name)
 
-        contents =
-            if List.isEmpty project.keypairs then
+        renderKeypairs keypairs =
+            if List.isEmpty keypairs then
                 Element.text <|
                     String.concat
                         [ "(This "
@@ -731,7 +771,7 @@ keypairPicker context project viewParams =
                                     ]
                             )
                     , onChange = \keypairName -> updateCreateServerRequest project { viewParams | keypairName = Just keypairName }
-                    , options = List.map keypairAsOption project.keypairs
+                    , options = List.map keypairAsOption keypairs
                     , selected = Just (Maybe.withDefault "" viewParams.keypairName)
                     }
     in
@@ -742,7 +782,34 @@ keypairPicker context project viewParams =
             (Element.text
                 (Helpers.String.toTitleCase context.localization.pkiPublicKeyForSsh)
             )
-        , contents
+        , VH.renderWebData
+            context
+            project.keypairs
+            (Helpers.String.pluralize context.localization.pkiPublicKeyForSsh)
+            renderKeypairs
+        , let
+            text =
+                String.concat [ "Upload a new ", context.localization.pkiPublicKeyForSsh ]
+          in
+          Widget.iconButton
+            (Widget.Style.Material.textButton (SH.toMaterialPalette context.palette))
+            { text = text
+            , icon =
+                Element.row
+                    [ Element.spacing 5 ]
+                    [ Element.text text
+                    , Element.el []
+                        (FeatherIcons.chevronRight
+                            |> FeatherIcons.toHtml []
+                            |> Element.html
+                        )
+                    ]
+            , onPress =
+                Just <|
+                    ProjectMsg project.auth.project.uuid <|
+                        SetProjectView <|
+                            CreateKeypair "" ""
+            }
         ]
 
 

@@ -7,6 +7,7 @@ module View.Helpers exposing
     , exoElementAttributes
     , exoPaddingSpacingAttributes
     , exoRowAttributes
+    , featuredImageNamePrefixLookup
     , friendlyProjectTitle
     , getServerUiStatus
     , getServerUiStatusColor
@@ -15,21 +16,24 @@ module View.Helpers exposing
     , heading3
     , heading4
     , hint
+    , imageExcludeFilterLookup
     , inputItemAttributes
     , possiblyUntitledResource
     , renderMarkdown
     , renderMessageAsElement
     , renderMessageAsString
+    , renderWebData
     , titleFromHostname
     , toExoPalette
     , toViewContext
+    , userAppProxyLookup
     )
 
 import Color
+import Dict
 import Element
 import Element.Background as Background
 import Element.Border
-import Element.Events
 import Element.Font as Font
 import Element.Input
 import Element.Region as Region
@@ -44,6 +48,7 @@ import Markdown.Parser
 import Markdown.Renderer
 import OpenStack.Types as OSTypes
 import Regex
+import RemoteData
 import Style.Helpers as SH
 import Style.Types exposing (ExoPalette)
 import Types.Error exposing (ErrorLevel(..), toFriendlyErrorLevel)
@@ -61,13 +66,14 @@ import Types.Types
         , Style
         )
 import View.Types
+import Widget
 
 
 toViewContext : Model -> View.Types.Context
 toViewContext model =
     { palette = toExoPalette model.style
-    , isElectron = Helpers.appIsElectron model
     , localization = model.style.localization
+    , cloudSpecificConfigs = model.cloudSpecificConfigs
     }
 
 
@@ -276,19 +282,11 @@ browserLink context url label =
                     , contents = el
                     }
     in
-    if context.isElectron then
-        Element.el
-            (renderedLabel.attribs
-                ++ [ Element.Events.onClick (OpenInBrowser url) ]
-            )
-            renderedLabel.contents
-
-    else
-        Element.newTabLink
-            renderedLabel.attribs
-            { url = url
-            , label = renderedLabel.contents
-            }
+    Element.newTabLink
+        renderedLabel.attribs
+        { url = url
+        , label = renderedLabel.contents
+        }
 
 
 possiblyUntitledResource : String -> String -> String
@@ -322,6 +320,43 @@ titleFromHostname hostname =
 
         _ ->
             hostname
+
+
+renderWebData : View.Types.Context -> RemoteData.WebData a -> String -> (a -> Element.Element Msg) -> Element.Element Msg
+renderWebData context remoteData resourceWord renderSuccessCase =
+    let
+        loadingStuff =
+            Element.row [ Element.spacing 15 ]
+                [ Widget.circularProgressIndicator
+                    (SH.materialStyle context.palette).progressIndicator
+                    Nothing
+                , Element.text <|
+                    String.concat
+                        [ "Loading "
+                        , resourceWord
+                        , "..."
+                        ]
+                ]
+    in
+    case remoteData of
+        RemoteData.NotAsked ->
+            -- This is an ugly hack because some of our API calls don't set RemoteData to "Loading" when they should.
+            loadingStuff
+
+        RemoteData.Loading ->
+            loadingStuff
+
+        RemoteData.Failure error ->
+            Element.text <|
+                String.join " "
+                    [ "Could not load"
+                    , resourceWord
+                    , "because:"
+                    , Debug.toString error
+                    ]
+
+        RemoteData.Success resource ->
+            renderSuccessCase resource
 
 
 getServerUiStatus : Server -> ServerUiStatus
@@ -669,3 +704,33 @@ friendlyProjectTitle model project =
 
     else
         providerTitle
+
+
+imageExcludeFilterLookup : View.Types.Context -> Project -> Maybe Types.Types.ExcludeFilter
+imageExcludeFilterLookup context project =
+    let
+        projectKeystoneHostname =
+            UrlHelpers.hostnameFromUrl project.endpoints.keystone
+    in
+    Dict.get projectKeystoneHostname context.cloudSpecificConfigs
+        |> Maybe.andThen (\csc -> csc.imageExcludeFilter)
+
+
+featuredImageNamePrefixLookup : View.Types.Context -> Project -> Maybe String
+featuredImageNamePrefixLookup context project =
+    let
+        projectKeystoneHostname =
+            UrlHelpers.hostnameFromUrl project.endpoints.keystone
+    in
+    Dict.get projectKeystoneHostname context.cloudSpecificConfigs
+        |> Maybe.andThen (\csc -> csc.featuredImageNamePrefix)
+
+
+userAppProxyLookup : View.Types.Context -> Project -> Maybe Types.Types.UserAppProxyHostname
+userAppProxyLookup context project =
+    let
+        projectKeystoneHostname =
+            UrlHelpers.hostnameFromUrl project.endpoints.keystone
+    in
+    Dict.get projectKeystoneHostname context.cloudSpecificConfigs
+        |> Maybe.andThen (\csc -> csc.userAppProxy)
