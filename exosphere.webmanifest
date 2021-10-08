@@ -22,6 +22,6 @@
   ],
   "start_url": "/exosphere/",
   "display": "minimal-ui",
-  "theme_color": "#FFFFFF",
-  "background_color": "#FFFFFF"
+  "theme_color": "#181725FF",
+  "background_color": "##181725FF"
 }
