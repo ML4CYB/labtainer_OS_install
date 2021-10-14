@@ -87,6 +87,27 @@ elm_make:
     paths:
       - public
 
+
+minify:
+  stage: build
+  needs:
+    - elm_make
+  before_script:
+    - if [ -d home/.npm ]; then echo "Restoring ~/.npm"; mv home/.npm ~/; fi
+    - npm install
+  script:
+    - ln --force --symbolic public/elm-web.js elm-web.js
+    - npm run minify
+  after_script:
+    - mkdir -p home && mv ~/.npm home
+  artifacts:
+    paths:
+      - public
+  only:
+    - master
+    - dev
+
+
 build_style_guide:
   stage: test
   needs:
