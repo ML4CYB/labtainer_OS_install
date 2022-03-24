@@ -435,7 +435,7 @@ view context project model =
                         canBeLaunched quota fl =
                             case OSQuotas.computeQuotaFlavorAvailServers quota fl of
                                 Nothing ->
-                                    True
+                                    False
 
                                 Just availServers ->
                                     not (availServers < 1)
