@@ -438,11 +438,8 @@ view context project model =
                                     True
 
                                 Just availServers ->
-                                    if availServers < 1 then
-                                        False
-
-                                    else
-                                        True
+                                    not (availServers < 1) 
+                                    
                     in
                     List.any (\e -> e == True) flavorAvailability
 
