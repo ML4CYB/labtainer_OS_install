@@ -440,7 +440,7 @@ view context project model =
                             allowedFlavors
                                 |> List.map (canBeLaunched computeQuota)
                     in
-                    List.any (\e -> e == True) flavorAvailability
+                    List.any identity flavorAvailability
 
                 ( createOnPress, maybeInvalidFormReasons ) =
                     let
