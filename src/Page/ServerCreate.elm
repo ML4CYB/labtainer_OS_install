@@ -427,11 +427,6 @@ view context project model =
                                     restrictedFlavorIds
                                         |> List.filterMap (GetterSetters.flavorLookup project)
 
-                        flavorAvailability : List Bool
-                        flavorAvailability =
-                            allowedFlavors
-                                |> List.map (canBeLaunched computeQuota)
-
                         canBeLaunched quota fl =
                             case OSQuotas.computeQuotaFlavorAvailServers quota fl of
                                 Nothing ->
@@ -439,6 +434,11 @@ view context project model =
 
                                 Just availServers ->
                                     availServers >= 1
+
+                        flavorAvailability : List Bool
+                        flavorAvailability =
+                            allowedFlavors
+                                |> List.map (canBeLaunched computeQuota)
                     in
                     List.any (\e -> e == True) flavorAvailability
 
