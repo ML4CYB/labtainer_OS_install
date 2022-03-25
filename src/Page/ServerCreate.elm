@@ -518,7 +518,11 @@ view context project model =
 
                                 noResourcesAvailable =
                                     if hasAvailableResources == False then
-                                        [ "Resource limits have been exhausted. Contact your cloud administrator, or delete some stuff" ]
+                                        [ (context.localization.maxResourcesPerProject
+                                            |> Helpers.String.toTitleCase
+                                          )
+                                            ++ " have been exhausted. Contact your cloud administrator, or delete some stuff"
+                                        ]
 
                                     else
                                         []
