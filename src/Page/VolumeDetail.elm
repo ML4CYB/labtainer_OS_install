@@ -115,7 +115,7 @@ volumeDetail context project model =
                     [ Style.Widgets.Card.exoCard context.palette
                         (Element.column
                             VH.contentContainer
-                            [ Element.row []
+                            [ Element.row [ Element.width Element.fill ]
                                 [ Element.el
                                     (VH.heading3 context.palette)
                                   <|
@@ -151,15 +151,8 @@ volumeDetail context project model =
                             ]
                         )
                     , Element.row [] [ Element.el [] (Element.text " ") ]
-                    , Style.Widgets.Card.exoCard context.palette
-                        (Element.column
-                            VH.contentContainer
-                            [ Element.column []
-                                [ renderAttachments context project volume
-                                , volumeActionButtons context project model volume
-                                ]
-                            ]
-                        )
+                    , renderAttachments context project volume
+                    , volumeActionButtons context project model volume
                     ]
             )
 
@@ -211,16 +204,20 @@ renderAttachments context project volume =
             Element.none
 
         _ ->
-            Element.column []
-                [ Element.row [ Element.paddingXY 0 15 ]
-                    [ Element.el
-                        (VH.heading3 context.palette)
-                      <|
-                        Element.text "Attached to"
-                    ]
-                , Element.row []
-                    [ Element.row (VH.exoColumnAttributes ++ [ Element.padding 0 ]) <| List.map (renderAttachment context project) volume.attachments
-                    ]
+            Element.column [ Element.width Element.fill ]
+                [ Style.Widgets.Card.exoCard
+                    context.palette
+                    (Element.column VH.contentContainer
+                        [ Element.column [ Element.width Element.fill ]
+                            [ Element.el
+                                (VH.heading3 context.palette)
+                              <|
+                                Element.text "Attached to"
+                            , Element.row (VH.exoColumnAttributes ++ [ Element.paddingXY 0 10 ]) <| List.map (renderAttachment context project) volume.attachments
+                            ]
+                        ]
+                    )
+                , Element.row [] [ Element.el [] (Element.text " ") ]
                 ]
 
 
@@ -234,27 +231,24 @@ volumeActionButtons context project model volume =
     let
         volDetachDeleteWarning =
             if GetterSetters.isBootVolume Nothing volume then
-                Element.el [ Font.color <| SH.toElementColor context.palette.warn ] <|
-                    Element.text
-                        (String.concat
-                            [ "This "
-                            , context.localization.blockDevice
-                            , " backs a "
-                            , context.localization.virtualComputer
-                            , "; it cannot be detached or deleted until the "
-                            , context.localization.virtualComputer
-                            , " is deleted."
-                            ]
-                        )
+                Element.text <|
+                    String.concat
+                        [ "This "
+                        , context.localization.blockDevice
+                        , " backs a "
+                        , context.localization.virtualComputer
+                        , "; it cannot be detached or deleted until the "
+                        , context.localization.virtualComputer
+                        , " is deleted."
+                        ]
 
             else if volume.status == OSTypes.InUse then
-                Element.el [ Font.color <| SH.toElementColor context.palette.warn ] <|
-                    Element.text <|
-                        String.join " "
-                            [ "This"
-                            , context.localization.blockDevice
-                            , "must be detached before it can be deleted."
-                            ]
+                Element.text <|
+                    String.join " "
+                        [ "This"
+                        , context.localization.blockDevice
+                        , "must be detached before it can be deleted."
+                        ]
 
             else
                 Element.none
@@ -337,10 +331,13 @@ volumeActionButtons context project model volume =
                             "Delete"
                             (Just <| GotDeleteNeedsConfirm)
     in
-    Element.column (Element.width Element.fill :: VH.exoColumnAttributes)
-        [ Element.row [ Element.width Element.fill, Element.spacing 10 ]
-            [ attachDetachButton
-            , volDetachDeleteWarning
-            , Element.el [ Element.alignRight ] deleteButton
+    Style.Widgets.Card.exoCard
+        context.palette
+        (Element.column VH.contentContainer
+            [ volDetachDeleteWarning
+            , Element.row [ Element.alignRight, Element.spacing 10 ]
+                [ attachDetachButton
+                , deleteButton
+                ]
             ]
-        ]
+        )
