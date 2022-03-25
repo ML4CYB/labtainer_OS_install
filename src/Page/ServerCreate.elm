@@ -518,7 +518,7 @@ view context project model =
 
                                 noResourcesAvailable =
                                     if hasAvailableResources == False then
-                                        [ "Quota exhausted. Contact your cloud administrator, or delete some stuff" ]
+                                        [ "Resource limits have been exhausted. Contact your cloud administrator, or delete some stuff" ]
 
                                     else
                                         []
