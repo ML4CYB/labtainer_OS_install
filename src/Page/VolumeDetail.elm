@@ -181,7 +181,7 @@ renderAttachment context project attachment =
     in
     Element.column
         (VH.exoColumnAttributes ++ [ Element.padding 0 ])
-        [ VH.compactKVRow "Server:" <|
+        [ VH.compactKVRow ((context.localization.virtualComputer |> Helpers.String.toTitleCase) ++ ":") <|
             Element.link []
                 { url =
                     Route.toUrl context.urlPathPrefix <|
