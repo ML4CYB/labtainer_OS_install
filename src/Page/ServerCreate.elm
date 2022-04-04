@@ -519,6 +519,7 @@ view context project model =
                                 noResourcesAvailable =
                                     if hasAvailableResources == False then
                                         [ (context.localization.maxResourcesPerProject
+                                            |> Helpers.String.pluralize
                                             |> Helpers.String.toTitleCase
                                           )
                                             ++ " have been exhausted. Contact your cloud administrator, or delete some stuff"
