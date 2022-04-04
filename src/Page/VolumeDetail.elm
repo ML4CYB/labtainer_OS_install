@@ -80,13 +80,20 @@ update msg project model =
 
 view : View.Types.Context -> Project -> Model -> Element.Element Msg
 view context project model =
+    let
+        volumeName =
+            GetterSetters.volumeLookup project model.volumeUuid
+                |> Maybe.map (\vol -> vol.name)
+                |> Maybe.withDefault model.volumeUuid
+    in
     if model.showHeading then
         Element.column
             (VH.exoColumnAttributes ++ [ Element.width Element.fill ])
             [ Element.el (VH.heading2 context.palette) <|
                 Element.text <|
-                    String.join " "
-                        [ context.localization.blockDevice |> Helpers.String.toTitleCase ]
+                    (context.localization.blockDevice |> Helpers.String.toTitleCase)
+                        ++ " "
+                        ++ volumeName
             , volumeDetail context project model
             ]
 
