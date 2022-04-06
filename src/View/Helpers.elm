@@ -1441,11 +1441,11 @@ invalidInputHelperText palette helperText =
                 |> FeatherIcons.toHtml []
                 |> Element.html
             )
-        , Element.el
+        , Element.paragraph
             [ Font.color (SH.toElementColor palette.error)
             , Font.size 16
             ]
-            (Element.text helperText)
+            [ Element.text helperText ]
         ]
 
 

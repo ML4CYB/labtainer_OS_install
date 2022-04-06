@@ -552,7 +552,7 @@ view context project model =
                                         (SH.popoverStyleDefaults context.palette
                                             ++ [ Element.width
                                                     (Element.fill
-                                                        |> Element.minimum 100
+                                                        |> Element.minimum 400
                                                     )
                                                ]
                                         )
