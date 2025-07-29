@@ -13,6 +13,7 @@ import Helpers.ResourceList exposing (creationTimeFilterOptions, listItemColumnA
 import Helpers.String
 import OpenStack.Types as OSTypes
 import Page.QuotaUsage
+import Page.ServerList.SegmentedFilter as SegmentedFilter
 import Route
 import Set
 import Style.Helpers as SH
@@ -37,10 +38,33 @@ import View.Types
 import Widget
 
 
+sortCreators : List String -> String -> List String
+sortCreators emails meEmail =
+    let
+        mine =
+            if List.member meEmail emails then
+                [ meEmail ]
+
+            else
+                []
+
+        others =
+            emails
+                |> Set.fromList
+                |> Set.toList
+                |> List.filter (\email -> email /= "" && email /= meEmail)
+                |> List.sort
+    in
+    mine ++ others
+
+
 type alias Model =
     { showHeading : Bool
     , dataListModel : DataList.Model
     , retainFloatingIpsWhenDeleting : Bool
+    , selectedCreators : List String
+    , selectedAges : List String
+    , selectedReadyStates : String
     }
 
 
@@ -50,6 +74,9 @@ type Msg
     | OpenInteraction String
     | DataListMsg DataList.Msg
     | SharedMsg SharedMsg.SharedMsg
+    | UpdateExampleFilter (List String)
+    | UpdateStatusFilter (List String)
+    | UpdateServerListFilter String
     | NoOp
 
 
@@ -61,6 +88,9 @@ init context project showHeading =
                 (filters context project project.auth.user.name (Time.millisToPosix 0))
         )
         False
+        [ project.auth.user.name ]
+        []
+        "all"
 
 
 update : Msg -> Project -> Model -> ( Model, Cmd Msg, SharedMsg.SharedMsg )
@@ -94,6 +124,24 @@ update msg project model =
 
         SharedMsg sharedMsg ->
             ( model, Cmd.none, sharedMsg )
+
+        UpdateExampleFilter selections ->
+            let
+                newSelections =
+                    if List.member "" selections then
+                        -- If "All Creators" was somehow in the list with others, clear it
+                        []
+
+                    else
+                        selections
+            in
+            ( { model | selectedCreators = newSelections }, Cmd.none, SharedMsg.NoOp )
+
+        UpdateStatusFilter selections ->
+            ( { model | selectedAges = selections }, Cmd.none, SharedMsg.NoOp )
+
+        UpdateServerListFilter filter ->
+            ( { model | selectedReadyStates = filter }, Cmd.none, SharedMsg.NoOp )
 
         NoOp ->
             ( model, Cmd.none, SharedMsg.NoOp )
@@ -145,25 +193,116 @@ view context project currentTime model =
                     else
                         let
                             serversList =
-                                serverRecords context currentTime project servers
+                                serverRecords context currentTime project servers model.selectedReadyStates model.selectedCreators model.selectedAges
                         in
-                        DataList.view
-                            context.localization.virtualComputer
-                            model.dataListModel
-                            DataListMsg
-                            context
-                            []
-                            (serverView context currentTime project model.retainFloatingIpsWhenDeleting)
-                            serversList
-                            [ deletionAction context project ]
-                            (Just
-                                { filters = filters context project project.auth.user.name currentTime
-                                , dropdownMsgMapper =
-                                    \dropdownId ->
-                                        SharedMsg <| SharedMsg.TogglePopover dropdownId
-                                }
-                            )
-                            Nothing
+                        Element.column [ Element.spacing spacer.px16 ]
+                            [ Element.row [ Element.spacing spacer.px16 ]
+                                [ SegmentedFilter.view
+                                    { selected = model.selectedReadyStates
+                                    , options =
+                                        [ { value = "all", label = "All" }
+                                        , { value = "ready", label = "Ready" }
+                                        , { value = "shelved", label = "Shelved" }
+                                        ]
+                                    , onChange =
+                                        \values ->
+                                            case values of
+                                                first :: _ ->
+                                                    UpdateServerListFilter first
+
+                                                [] ->
+                                                    UpdateServerListFilter "all"
+                                    , palette = context.palette
+                                    , filterType = SegmentedFilter.Radio
+                                    , dropdownMsgMapper = SharedMsg << SharedMsg.TogglePopover
+                                    , showPopovers = context.showPopovers
+                                    , labelPrefix = ""
+                                    }
+                                , SegmentedFilter.view
+                                    { selected =
+                                        case model.selectedCreators of
+                                            first :: _ ->
+                                                first
+
+                                            _ ->
+                                                project.auth.user.name
+                                    , options =
+                                        let
+                                            selectedCreators =
+                                                sortCreators (List.map (serverCreatorName project) servers) project.auth.user.name
+                                        in
+                                        ""
+                                            :: selectedCreators
+                                            |> List.map
+                                                (\email ->
+                                                    case email of
+                                                        "" ->
+                                                            { value = "", label = "All creators" }
+
+                                                        _ ->
+                                                            { value = email, label = email }
+                                                )
+                                    , onChange =
+                                        \selections ->
+                                            let
+                                                normalizedSelections =
+                                                    if List.member "" selections then
+                                                        -- If "All Creators" is selected, clear all other selections
+                                                        []
+
+                                                    else
+                                                        selections
+                                            in
+                                            UpdateExampleFilter (sortCreators normalizedSelections project.auth.user.name)
+                                    , palette = context.palette
+                                    , filterType =
+                                        SegmentedFilter.Dropdown
+                                            model.selectedCreators
+                                            "Filter by creator"
+                                    , dropdownMsgMapper = SharedMsg << SharedMsg.TogglePopover
+                                    , showPopovers = context.showPopovers
+                                    , labelPrefix = "Created by"
+                                    }
+                                , SegmentedFilter.view
+                                    { selected =
+                                        case model.selectedAges of
+                                            first :: _ ->
+                                                first
+
+                                            [] ->
+                                                ""
+                                    , options =
+                                        [ { value = "", label = "All" }
+                                        , { value = "0086400000", label = "Past day" }
+                                        , { value = "0604800000", label = "Past week" }
+                                        , { value = "2592000000", label = "Past 30 days" }
+                                        ]
+                                    , onChange = \times -> UpdateStatusFilter times
+                                    , palette = context.palette
+                                    , filterType = SegmentedFilter.Radio
+                                    , dropdownMsgMapper = SharedMsg << SharedMsg.TogglePopover
+                                    , showPopovers = context.showPopovers
+                                    , labelPrefix = ""
+                                    }
+                                ]
+                            , DataList.view
+                                context.localization.virtualComputer
+                                model.dataListModel
+                                DataListMsg
+                                context
+                                []
+                                (serverView context currentTime project model.retainFloatingIpsWhenDeleting)
+                                serversList
+                                [ deletionAction context project ]
+                                (Just
+                                    { filters = filters context project project.auth.user.name currentTime
+                                    , dropdownMsgMapper =
+                                        \dropdownId ->
+                                            SharedMsg <| SharedMsg.TogglePopover dropdownId
+                                    }
+                                )
+                                Nothing
+                            ]
     in
     Element.column (VH.contentContainer ++ [ Element.spacing spacer.px32 ])
         [ if model.showHeading then
@@ -204,8 +343,11 @@ serverRecords :
     -> Time.Posix
     -> Project
     -> List Server
+    -> String
+    -> List String
+    -> List String
     -> List (ServerRecord msg)
-serverRecords context currentTime project servers =
+serverRecords context currentTime project servers filterValue filteredCreators filteredTimes =
     let
         floatingIpAddress server =
             List.head (GetterSetters.getServerFloatingIps project server.osProps.uuid)
@@ -242,6 +384,64 @@ serverRecords context currentTime project servers =
             GetterSetters.getServerSecurityGroups project server.osProps.uuid
                 |> RDPP.withDefault []
                 |> List.map .uuid
+
+        filterServer : Server -> Bool
+        filterServer server =
+            let
+                byCreator =
+                    case filteredCreators of
+                        [] ->
+                            True
+
+                        [ "" ] ->
+                            True
+
+                        creators ->
+                            serverCreatorName project server
+                                |> (\email -> List.member email filteredCreators)
+
+                byStatus =
+                    case filterValue of
+                        "ready" ->
+                            -- Show only active servers
+                            case server.osProps.details.openstackStatus of
+                                OSTypes.ServerActive ->
+                                    True
+
+                                _ ->
+                                    False
+
+                        "shelved" ->
+                            -- Show only shelved servers
+                            case server.osProps.details.openstackStatus of
+                                OSTypes.ServerShelved ->
+                                    True
+
+                                OSTypes.ServerShelvedOffloaded ->
+                                    True
+
+                                _ ->
+                                    False
+
+                        _ ->
+                            -- Show all servers for other cases or "all"
+                            True
+
+                byTime =
+                    case filteredTimes of
+                        [] ->
+                            True
+
+                        [ "" ] ->
+                            True
+
+                        [ t ] ->
+                            onCreationTimeFilter t server.osProps.details.created currentTime
+
+                        _ ->
+                            True
+            in
+            byCreator && byStatus && byTime
     in
     List.map
         (\server ->
@@ -257,7 +457,7 @@ serverRecords context currentTime project servers =
             , securityGroupIds = serverSecurityGroupIds server
             }
         )
-        servers
+        (List.filter filterServer servers)
 
 
 serverView :
@@ -572,7 +772,7 @@ filters context project currentUser currentTime =
             DataList.MultiselectOption <| Set.singleton currentUser
       , onFilter =
             \optionValue server ->
-                server.creator == optionValue
+                True
       }
     , { id = "creationTime"
       , label = "Created within"
