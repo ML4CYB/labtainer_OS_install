@@ -3,6 +3,7 @@ module Style.Widgets.Spacer exposing (Spacer, spacer)
 
 type alias Spacer =
     { px4 : Int
+    , px6 : Int
     , px8 : Int
     , px12 : Int
     , px16 : Int
@@ -22,6 +23,7 @@ The sizes chosen in this record are based on <https://www.refactoringui.com/> bo
 spacer : Spacer
 spacer =
     { px4 = 4
+    , px6 = 6
     , px8 = 8
     , px12 = 12
     , px16 = 16

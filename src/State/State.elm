@@ -293,6 +293,7 @@ updateUnderlying outerMsg outerModel =
                 |> pipelineCmdOuterModelMsg
                     (processSharedMsg sharedMsg)
 
+
         ( pageSpecificMsg, ProjectView projectId projectViewConstructor ) ->
             case GetterSetters.projectLookup sharedModel projectId of
                 Just project ->
@@ -496,13 +497,13 @@ updateUnderlying outerMsg outerModel =
 
                         ( ServerListMsg pageMsg, ServerList pageModel ) ->
                             let
-                                ( newSharedModel, cmd, sharedMsg ) =
+                                ( newPageModel, cmd, sharedMsg ) =
                                     Page.ServerList.update pageMsg project pageModel
                             in
                             ( { outerModel
                                 | viewState =
                                     ProjectView projectId <|
-                                        ServerList newSharedModel
+                                        ServerList newPageModel
                               }
                             , Cmd.map ServerListMsg cmd
                             )
