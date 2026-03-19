@@ -19,6 +19,8 @@ import View.Types
 
 type alias Model =
     { creds : OSTypes.OpenstackLogin
+    , appCredentialAuthUrl : OSTypes.KeystoneUrl
+    , appCredential : OSTypes.ApplicationCredential
     , openRc : String
     , entryType : EntryType
     }
@@ -26,16 +28,21 @@ type alias Model =
 
 type EntryType
     = CredsEntry
+    | AppCredEntry
     | OpenRcEntry
 
 
 type Msg
     = GotAuthUrl String
+    | GotAppCredAuthUrl String
     | GotUserDomain String
     | GotUsername String
     | GotPassword String
+    | GotAppCredentialId String
+    | GotAppCredentialSecret String
     | GotOpenRc String
     | GotSelectOpenRcInput
+    | GotSelectAppCredInput
     | GotSelectCredsInput
     | GotProcessOpenRc
     | SharedMsg SharedMsg.SharedMsg
@@ -43,8 +50,13 @@ type Msg
 
 init : Maybe OSTypes.OpenstackLogin -> Model
 init maybeCreds =
-    { creds =
-        Maybe.withDefault defaultCreds maybeCreds
+    let
+        creds =
+            Maybe.withDefault defaultCreds maybeCreds
+    in
+    { creds = creds
+    , appCredentialAuthUrl = creds.authUrl
+    , appCredential = defaultAppCredential
     , openRc = ""
     , entryType = CredsEntry
     }
@@ -56,6 +68,13 @@ defaultCreds =
     , userDomain = ""
     , username = ""
     , password = ""
+    }
+
+
+defaultAppCredential : OSTypes.ApplicationCredential
+defaultAppCredential =
+    { uuid = ""
+    , secret = ""
     }
 
 
@@ -71,7 +90,22 @@ update msg _ model =
     in
     case msg of
         GotAuthUrl authUrl ->
-            ( updateCreds model { oldCreds | authUrl = authUrl }, Cmd.none, SharedMsg.NoOp )
+            ( { model
+                | creds = { oldCreds | authUrl = authUrl }
+                , appCredentialAuthUrl = authUrl
+              }
+            , Cmd.none
+            , SharedMsg.NoOp
+            )
+
+        GotAppCredAuthUrl authUrl ->
+            ( { model
+                | creds = { oldCreds | authUrl = authUrl }
+                , appCredentialAuthUrl = authUrl
+              }
+            , Cmd.none
+            , SharedMsg.NoOp
+            )
 
         GotUserDomain userDomain ->
             ( updateCreds model { oldCreds | userDomain = userDomain }, Cmd.none, SharedMsg.NoOp )
@@ -82,11 +116,36 @@ update msg _ model =
         GotPassword password ->
             ( updateCreds model { oldCreds | password = password }, Cmd.none, SharedMsg.NoOp )
 
+        GotAppCredentialId appCredId ->
+            ( { model
+                | appCredential =
+                    { uuid = appCredId
+                    , secret = model.appCredential.secret
+                    }
+              }
+            , Cmd.none
+            , SharedMsg.NoOp
+            )
+
+        GotAppCredentialSecret appCredSecret ->
+            ( { model
+                | appCredential =
+                    { uuid = model.appCredential.uuid
+                    , secret = appCredSecret
+                    }
+              }
+            , Cmd.none
+            , SharedMsg.NoOp
+            )
+
         GotOpenRc openRc ->
             ( { model | openRc = openRc }, Cmd.none, SharedMsg.NoOp )
 
         GotSelectOpenRcInput ->
             ( { model | entryType = OpenRcEntry }, Cmd.none, SharedMsg.NoOp )
+
+        GotSelectAppCredInput ->
+            ( { model | entryType = AppCredEntry }, Cmd.none, SharedMsg.NoOp )
 
         GotSelectCredsInput ->
             ( { model | entryType = CredsEntry }, Cmd.none, SharedMsg.NoOp )
@@ -95,10 +154,27 @@ update msg _ model =
             let
                 newCreds =
                     OpenStack.OpenRc.processOpenRc model.creds model.openRc
+
+                maybeAppCredential =
+                    OpenStack.OpenRc.parseOpenRcAppCredential model.openRc
+
+                entryTypeFromOpenRc =
+                    case maybeAppCredential of
+                        Just _ ->
+                            AppCredEntry
+
+                        Nothing ->
+                            if OpenStack.OpenRc.openRcUsesAppCredentialAuth model.openRc then
+                                AppCredEntry
+
+                            else
+                                CredsEntry
             in
             ( { model
                 | creds = newCreds
-                , entryType = CredsEntry
+                , appCredentialAuthUrl = newCreds.authUrl
+                , appCredential = Maybe.withDefault model.appCredential maybeAppCredential
+                , entryType = entryTypeFromOpenRc
               }
             , Cmd.none
             , SharedMsg.NoOp
@@ -128,11 +204,22 @@ view context _ model =
             ]
                 |> List.any (\x -> String.isEmpty x)
                 |> not
+
+        allAppCredentialFieldsEntered =
+            [ model.appCredentialAuthUrl
+            , model.appCredential.uuid
+            , model.appCredential.secret
+            ]
+                |> List.any String.isEmpty
+                |> not
     in
     Element.column (VH.formContainer ++ [ Element.spacing spacer.px16 ])
         [ case model.entryType of
             CredsEntry ->
                 loginOpenstackCredsEntry context model allCredsEntered
+
+            AppCredEntry ->
+                loginOpenstackAppCredEntry context model allAppCredentialFieldsEntered
 
             OpenRcEntry ->
                 loginOpenstackOpenRcEntry context model
@@ -152,6 +239,11 @@ view context _ model =
                         { text = "Use OpenRC File"
                         , onPress = Just GotSelectOpenRcInput
                         }
+                    , Button.default
+                        context.palette
+                        { text = "Use Application " ++ Helpers.String.toTitleCase context.localization.credential
+                        , onPress = Just GotSelectAppCredInput
+                        }
                     , Element.el [ Element.alignRight ]
                         (Button.primary
                             context.palette
@@ -159,6 +251,40 @@ view context _ model =
                             , onPress =
                                 if allCredsEntered then
                                     Just (SharedMsg <| SharedMsg.RequestUnscopedToken model.creds)
+
+                                else
+                                    Nothing
+                            }
+                        )
+                    ]
+
+                AppCredEntry ->
+                    [ Element.el []
+                        (VH.loginPickerButton context
+                            |> Element.map SharedMsg
+                        )
+                    , Button.default
+                        context.palette
+                        { text = "Use Username and Password"
+                        , onPress = Just GotSelectCredsInput
+                        }
+                    , Button.default
+                        context.palette
+                        { text = "Use OpenRC File"
+                        , onPress = Just GotSelectOpenRcInput
+                        }
+                    , Element.el [ Element.alignRight ]
+                        (Button.primary
+                            context.palette
+                            { text = "Log In"
+                            , onPress =
+                                if allAppCredentialFieldsEntered then
+                                    Just
+                                        (SharedMsg <|
+                                            SharedMsg.RequestProjectScopedTokenWithAppCredential
+                                                model.appCredentialAuthUrl
+                                                model.appCredential
+                                        )
 
                                 else
                                     Nothing
@@ -228,6 +354,57 @@ loginOpenstackCredsEntry context model allCredsEntered =
             , label = Input.labelAbove [ Text.fontSize Text.Small ] (Element.text "Password")
             }
         , if allCredsEntered then
+            Element.none
+
+          else
+            Element.el
+                [ Element.alignRight
+                , Font.color (context.palette.danger.textOnNeutralBG |> SH.toElementColor)
+                ]
+                (Element.text "All fields are required.")
+        ]
+
+
+loginOpenstackAppCredEntry : View.Types.Context -> Model -> Bool -> Element.Element Msg
+loginOpenstackAppCredEntry context model allAppCredentialFieldsEntered =
+    let
+        appCredentialText =
+            "application " ++ context.localization.credential
+
+        appCredentialLabel =
+            "Application " ++ Helpers.String.toTitleCase context.localization.credential
+
+        textField text placeholderText onChange labelText =
+            Input.text
+                (VH.inputItemAttributes context.palette)
+                { text = text
+                , placeholder = Just (Input.placeholder [] (Element.text placeholderText))
+                , onChange = onChange
+                , label = Input.labelAbove [ Text.fontSize Text.Small ] (Element.text labelText)
+                }
+    in
+    Element.column
+        (VH.formContainer ++ [ Element.spacing spacer.px16 ])
+        [ Element.el [] (Element.text ("Enter your " ++ appCredentialText ++ "."))
+        , textField
+            model.appCredentialAuthUrl
+            "OS_AUTH_URL e.g. https://mycloud.net:5000/v3"
+            GotAppCredAuthUrl
+            "Keystone auth URL"
+        , textField
+            model.appCredential.uuid
+            (appCredentialLabel ++ " ID")
+            GotAppCredentialId
+            (appCredentialLabel ++ " ID")
+        , Input.currentPassword
+            (VH.inputItemAttributes context.palette)
+            { text = model.appCredential.secret
+            , placeholder = Just (Input.placeholder [] (Element.text (appCredentialText ++ " secret")))
+            , show = False
+            , onChange = GotAppCredentialSecret
+            , label = Input.labelAbove [ Text.fontSize Text.Small ] (Element.text (appCredentialLabel ++ " Secret"))
+            }
+        , if allAppCredentialFieldsEntered then
             Element.none
 
           else
