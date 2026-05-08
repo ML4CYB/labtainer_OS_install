@@ -7,6 +7,7 @@ import Dict
 import Helpers.ExoSetupStatus
 import Helpers.GetterSetters as GetterSetters
 import Helpers.Helpers as Helpers
+import Helpers.Motd
 import Helpers.RemoteDataPlusPlus as RDPP
 import Helpers.ServerActionRequestQueue exposing (marshalServerActionRequestQueue)
 import Helpers.ServerResourceUsage
@@ -4416,6 +4417,25 @@ processServerSpecificMsg outerModel project server serverMsgConstructor =
                                         )
                                         (RDPP.NotLoading Nothing)
 
+                        newMotd =
+                            case result of
+                                Err httpError ->
+                                    RDPP.RemoteDataPlusPlus
+                                        exoOriginProps.motd.data
+                                        (RDPP.NotLoading (Just ( httpError, sharedModel.clientCurrentTime )))
+
+                                Ok consoleLog ->
+                                    case Helpers.Motd.parseConsoleLog consoleLog of
+                                        Just motdSnapshot ->
+                                            RDPP.RemoteDataPlusPlus
+                                                (RDPP.DoHave motdSnapshot sharedModel.clientCurrentTime)
+                                                (RDPP.NotLoading Nothing)
+
+                                        Nothing ->
+                                            RDPP.RemoteDataPlusPlus
+                                                exoOriginProps.motd.data
+                                                (RDPP.NotLoading Nothing)
+
                         newWorkflowToken : CustomWorkflow -> CustomWorkflowTokenRDPP
                         newWorkflowToken currentWorkflow =
                             case result of
@@ -4454,6 +4474,7 @@ processServerSpecificMsg outerModel project server serverMsgConstructor =
                             { exoOriginProps
                                 | resourceUsage = newResourceUsage
                                 , exoSetupStatus = newExoSetupStatusRDPP
+                                , motd = newMotd
                                 , customWorkflowStatus = newWorkflowStatus
                             }
 

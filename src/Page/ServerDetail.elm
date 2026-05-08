@@ -27,7 +27,7 @@ import Style.Helpers as SH
 import Style.Types as ST
 import Style.Widgets.Alert as Alert
 import Style.Widgets.Button as Button
-import Style.Widgets.CopyableText exposing (copyableText)
+import Style.Widgets.CopyableText exposing (copyableScript, copyableText)
 import Style.Widgets.Grid exposing (scrollableCell)
 import Style.Widgets.Icon as Icon
 import Style.Widgets.Link as Link
@@ -682,6 +682,7 @@ serverDetail_ context project ( currentTime, timeZone ) model server =
             ]
         , serverFaultView
         , connectivityWarningView
+        , renderMotdTile context server
         , if List.member details.openstackStatus [ OSTypes.ServerActive, OSTypes.ServerVerifyResize ] then
             VH.tile
                 context
@@ -698,6 +699,49 @@ serverDetail_ context project ( currentTime, timeZone ) model server =
             Element.none
         , Element.wrappedRow [ Element.spacing spacer.px24 ] serverDetailTiles
         ]
+
+
+renderMotdTile : View.Types.Context -> Server -> Element.Element Msg
+renderMotdTile context server =
+    case server.exoProps.serverOrigin of
+        ServerNotFromExo ->
+            Element.none
+
+        ServerFromExo exoOriginProps ->
+            if exoOriginProps.exoServerVersion < 7 then
+                Element.none
+
+            else
+                let
+                    content =
+                        case ( exoOriginProps.motd.data, exoOriginProps.motd.refreshStatus ) of
+                            ( RDPP.DoHave motdSnapshot _, _ ) ->
+                                if String.isEmpty motdSnapshot.text then
+                                    Element.text "No message of the day to show."
+
+                                else
+                                    copyableScript context.palette motdSnapshot.text
+
+                            ( RDPP.DontHave, RDPP.Loading ) ->
+                                Element.text "Loading message of the day..."
+
+                            ( RDPP.DontHave, RDPP.NotLoading (Just _) ) ->
+                                Element.text <|
+                                    String.join " "
+                                        [ "Could not access the"
+                                        , context.localization.virtualComputer
+                                        , "console log, message of the day not available."
+                                        ]
+
+                            ( RDPP.DontHave, RDPP.NotLoading Nothing ) ->
+                                Element.text "No message of the day snapshot to show yet."
+                in
+                VH.tile
+                    context
+                    [ Icon.featherIcon [] Icons.messageCircle
+                    , Element.text "Message of the Day"
+                    ]
+                    [ content ]
 
 
 serverNameEditView : View.Types.Context -> Project -> Time.Posix -> Model -> Server -> Element.Element Msg

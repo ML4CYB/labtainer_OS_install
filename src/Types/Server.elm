@@ -3,6 +3,8 @@ module Types.Server exposing
     , ExoServerProps
     , ExoServerVersion
     , ExoSetupStatus(..)
+    , MotdSnapshot
+    , MotdSnapshotRDPP
     , NewServerNetworkOptions(..)
     , ResourceUsageRDPP
     , Server
@@ -65,6 +67,7 @@ type alias ServerFromExoProps =
     { exoServerVersion : ExoServerVersion
     , exoSetupStatus : RDPP.RemoteDataPlusPlus HttpErrorWithBody ( ExoSetupStatus, Maybe Time.Posix )
     , resourceUsage : ResourceUsageRDPP
+    , motd : MotdSnapshotRDPP
     , guacamoleStatus : GuacTypes.ServerGuacamoleStatus
     , customWorkflowStatus : WorkflowTypes.ServerCustomWorkflowStatus
     , exoCreatorUsername : Maybe String
@@ -75,13 +78,23 @@ type alias ResourceUsageRDPP =
     RDPP.RemoteDataPlusPlus HttpErrorWithBody Types.ServerResourceUsage.History
 
 
+type alias MotdSnapshotRDPP =
+    RDPP.RemoteDataPlusPlus HttpErrorWithBody MotdSnapshot
+
+
+type alias MotdSnapshot =
+    { epoch : Time.Posix
+    , text : String
+    }
+
+
 type alias ExoServerVersion =
     Int
 
 
 currentExoServerVersion : ExoServerVersion
 currentExoServerVersion =
-    6
+    7
 
 
 type ExoFeature

@@ -315,9 +315,10 @@ requestFloatingIp project server =
 
 stepServerPollConsoleLog : Time.Posix -> Project -> Server -> ( Project, Cmd SharedMsg )
 stepServerPollConsoleLog time project server =
-    -- Now polling console log for two possible purposes:
+    -- Now polling console log for three possible purposes:
     -- 1. Get system resource usage data
     -- 2. Look for new exoSetup value (e.g. running, complete, or error)
+    -- 3. Look for a guest MOTD snapshot
     case server.exoProps.serverOrigin of
         ServerNotFromExo ->
             -- Don't poll server that won't be logging resource usage to console
@@ -325,6 +326,11 @@ stepServerPollConsoleLog time project server =
 
         ServerFromExo exoOriginProps ->
             let
+                shouldPollMotd =
+                    serverIsActiveEnough server
+                        && (exoOriginProps.exoServerVersion >= 7)
+                        && pollRDPP exoOriginProps.motd time (pollIntervalToMs Regular)
+
                 doPollLinesCombined : Maybe (Maybe Int)
                 doPollLinesCombined =
                     -- Poll the maximum amount of whatever log is needed between resource usage graphs and setup status
@@ -386,8 +392,16 @@ stepServerPollConsoleLog time project server =
                             else
                                 Nothing
 
+                        doPollLinesMotd : Maybe (Maybe Int)
+                        doPollLinesMotd =
+                            if shouldPollMotd then
+                                Just Nothing
+
+                            else
+                                Nothing
+
                         pollEntireLog =
-                            [ doPollLinesResourceUsage, doPollLinesExoSetupStatus ]
+                            [ doPollLinesResourceUsage, doPollLinesExoSetupStatus, doPollLinesMotd ]
                                 |> List.filterMap identity
                                 |> List.any
                                     (\x ->
@@ -405,7 +419,7 @@ stepServerPollConsoleLog time project server =
                     else
                         let
                             pollExplicitNumLines =
-                                [ doPollLinesResourceUsage, doPollLinesExoSetupStatus ]
+                                [ doPollLinesResourceUsage, doPollLinesExoSetupStatus, doPollLinesMotd ]
                                     |> List.filterMap identity
                                     |> List.filterMap identity
                                     |> List.maximum
@@ -424,10 +438,18 @@ stepServerPollConsoleLog time project server =
                         newResourceUsage =
                             RDPP.setLoading exoOriginProps.resourceUsage
 
+                        newMotd =
+                            if shouldPollMotd then
+                                RDPP.setLoading exoOriginProps.motd
+
+                            else
+                                exoOriginProps.motd
+
                         newExoOriginProps =
                             { exoOriginProps
                                 | resourceUsage = newResourceUsage
                                 , exoSetupStatus = newExoSetupStatus
+                                , motd = newMotd
                             }
 
                         oldExoProps =

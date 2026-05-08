@@ -624,7 +624,7 @@ serverOrigin serverDetails =
                         |> Maybe.map .value
             in
             ServerFromExo <|
-                ServerFromExoProps v exoSetupStatusRDPP RDPP.empty guacamoleStatus customWorkflowStatus creatorName
+                ServerFromExoProps v exoSetupStatusRDPP RDPP.empty RDPP.empty guacamoleStatus customWorkflowStatus creatorName
 
         Nothing ->
             ServerNotFromExo
