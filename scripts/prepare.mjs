@@ -2,27 +2,31 @@ import os from "os";
 import process from "child_process";
 import fs from "fs";
 import path from "path";
+import util from "util";
+
+const exec = util.promisify(process.exec);
 
 async function commandExists(command) {
   try {
-    if (os.platform() == "windows") {
-      process.exec(`where ${command}`);
+    if (os.platform() == "win32") {
+      await exec(`where ${command}`);
     } else {
-      process.exec(`command -v ${command}`);
+      await exec(`command -v ${command}`);
     }
+    return true;
   } catch (error) {
     return false;
   }
-  return true;
 }
 
 async function main() {
   if (!(await commandExists("pre-commit"))) {
     console.log("pre-commit is not installed, see contributing.md'");
+    return;
   }
 
   if (!fs.existsSync(path.join(".git", "hooks", "pre-commit"))) {
-    const stdout = process.execSync("pre-commit install", { encoding: "utf8" });
+    const { stdout } = await exec("pre-commit install", { encoding: "utf8" });
     console.log(stdout);
   }
 }
