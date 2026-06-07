@@ -1,0 +1,10 @@
+---
+
+- name: 'motd snapshot script copied into place'
+  copy:
+    src: 'motd_json.py'
+    dest: '/opt/motd_json.py'
+    mode: '0544'
+
+- name: 'motd snapshot logged'
+  shell: '/opt/motd_json.py > {{ console_file }}'
