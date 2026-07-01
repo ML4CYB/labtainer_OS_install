@@ -19,6 +19,7 @@
 - name: 'passphrase POSTed to OpenStack metadata service'
   command: 'curl --fail --silent --request POST {{ passphrase_post_url }} --data "{{ exouser_passphrase }}"'
   no_log: true
+  ignore_errors: true
 
 - name: 'passphrase set for exouser'
   user:
