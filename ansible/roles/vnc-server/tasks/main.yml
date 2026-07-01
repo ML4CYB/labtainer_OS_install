@@ -11,6 +11,17 @@
       paths:
         - "{{ role_path }}/vars"
 
+- name: 'operating system specific tasks imported'
+  include_tasks: "{{ item }}"
+  with_first_found:
+    - files:
+        - "{{ ansible_distribution }}-{{ ansible_distribution_version }}.yml"
+        - "{{ ansible_distribution }}-{{ ansible_distribution_major_version }}.yml"
+        - "{{ ansible_distribution }}.yml"
+        - "{{ ansible_os_family }}.yml"
+      paths:
+        - "{{ role_path }}/tasks"
+
 - name: 'user-specific VNC configuration directory created'
   file:
     path: '/home/{{ vnc_server_user }}/.vnc'
@@ -30,13 +41,4 @@
 - name: 'Set the default target to multi-user'
   command: systemctl set-default multi-user.target
 
-- name: 'operating system specific tasks imported'
-  include_tasks: "{{ item }}"
-  with_first_found:
-    - files:
-        - "{{ ansible_distribution }}-{{ ansible_distribution_version }}.yml"
-        - "{{ ansible_distribution }}-{{ ansible_distribution_major_version }}.yml"
-        - "{{ ansible_distribution }}.yml"
-        - "{{ ansible_os_family }}.yml"
-      paths:
-        - "{{ role_path }}/tasks"
+
