@@ -6,3 +6,4 @@
       - 'docker.io'
       - 'docker-compose-v2'
     state: 'present'
+  ignore_errors: true
